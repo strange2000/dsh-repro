@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.log
+# 取证产物（含本机路径与真实会话内容，不入库）
+*.db
+*.db-wal
+*.db-shm
+dump*.txt
