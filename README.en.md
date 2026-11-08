@@ -6,6 +6,8 @@ Field notes and reproduction material from issues I filed against the DSH plugin
 
 The point is one sentence: **"I measured it" should be replaceable by "you can re-run it here."**
 
+> These entries were later rearranged by **recurring defect pattern**: [**awesome-dsh**](https://github.com/strange2000/awesome-dsh) — six patterns and a pre-release checklist, each pointing back to a number here.
+
 ## What gets listed
 
 - **In the index** — the issue pins down a specific code location, or a specific observable criterion. Pure feature requests and "it felt wrong" reports don't make it.
