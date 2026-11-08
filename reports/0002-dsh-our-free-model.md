@@ -1,4 +1,6 @@
-# GitHub Issue 草稿 · 精简版（正文 约 2.6K 字符，远低于 65536 上限）
+# Issue draft · compact version (~2.6K characters, far below the 65536 limit)
+
+> This report is written in English only — there is no separate `.en.md`.
 
 <!-- tl;dr-en -->
 > **TL;DR** (this file is already the English issue draft)
