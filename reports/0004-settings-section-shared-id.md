@@ -1,5 +1,7 @@
 # 共享 `settings.section` id：一条冲突，两侧都要防守
 
+> [English](0004-settings-section-shared-id.en.md) · 中文
+
 <!-- tl;dr-en -->
 > **TL;DR**
 > - Two DSH plugins collided on the same `settings.section` id (`archived-sessions`): the claimer registered first and swallowed the collision in `try/catch`, the loser threw `Uncaught Error` and aborted its own client init.
