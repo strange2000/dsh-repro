@@ -42,6 +42,31 @@ const readIf = (f) => { try { return fs.readFileSync(f, 'utf8') } catch { return
 const readJson = (f) => { try { return JSON.parse(readIf(f) || 'null') } catch { return null } }
 const exists = (f) => { try { return fs.existsSync(f) } catch { return false } }
 
+/** 从源码里抠函数体（支持 function 声明与 const 箭头），按花括号配平；找不到返回 null。 */
+function fnBody(src, name) {
+  const pats = [
+    new RegExp('(?:export\\s+)?function\\s+' + name + '\\s*\\([\\s\\S]{0,200}?\\)\\s*\\{'),
+    new RegExp('(?:const|let|var)\\s+' + name + '\\s*=\\s*(?:async\\s*)?\\([\\s\\S]{0,200}?\\)\\s*=>\\s*\\{'),
+    new RegExp('(?:const|let|var)\\s+' + name + '\\s*=\\s*(?:async\\s*)?[A-Za-z_$][\\w$]*\\s*=>\\s*\\{'),
+  ]
+  for (const re of pats) {
+    const m = re.exec(src)
+    if (!m) continue
+    let i = m.index + m[0].length - 1
+    let depth = 0
+    const start = i
+    for (; i < src.length; i++) {
+      const c = src[i]
+      if (c === '{') depth++
+      else if (c === '}') {
+        depth--
+        if (depth === 0) return src.slice(start, i + 1)
+      }
+    }
+  }
+  return null
+}
+
 /* ------------------------------------------------------------------ 判定器 */
 /**
  * 只看源码文本，不执行插件代码 —— 对任何版本都安全。
@@ -119,15 +144,69 @@ function auditSources(src) {
     ok: overlayFalse && threeIds,
   })
 
+  // B5 判重表解析：只要「表格行 + 固定列位」就够不够？（#78：seen.md 有一百多条，一条也读不出来）
+  const scansForBv = /findIndex\(\s*\(?\s*\w+\s*\)?\s*=>\s*\/\^BV/.test(src)
+  const tolerantDay = /seenDay\(/.test(src)
+  const countsBad = /bad\s*\+\+|seenBadDays/.test(src)
+  checks.push({
+    id: 'B5',
+    title: '判重表解析：扫描 BV 位置 / 假设固定列位',
+    detail: scansForBv
+      ? 'BV 用 findIndex 扫描定位' +
+        (tolerantDay ? '，日期走 seenDay 宽松解析（带时间 / 省年份都认）' : '') +
+        (countsBad ? '，认不出的行会计数并 log' : '') +
+        ' ⇒ 章程怎么写都能读出来'
+      : '仍假设 BV 固定在某个列位 ⇒ seen.md 的写法一变，面板「它刷过的视频」就恒空（#78 原样）',
+    ok: scansForBv ? true : tolerantDay && countsBad ? null : false,
+  })
+
+  // B6 POST /config 的白名单：手工数组（漏字段）还是从 DEFAULTS 推导（自动跟上）
+  const derivesFromDefaults = /for\s*\(\s*const\s+k\s+of\s+Object\.keys\(DEFAULTS\)\s*\)\s*\{?\s*if\s*\(\s*k\s+in\s+body/.test(src)
+  const manualAllow = /const\s+ALLOW[A-Za-z_]*\s*=\s*\[/.test(src)
+  const blankGuard = /isBlank\s*\(/.test(src) || /空值保护/.test(src)
+  checks.push({
+    id: 'B6',
+    title: '配置写入通道的白名单：从 DEFAULTS 推导 / 手写数组',
+    detail: derivesFromDefaults
+      ? '白名单由 Object.keys(DEFAULTS) 推导 ⇒ 新增配置项自动放行' + (blankGuard ? '，且带空值保护（空值不覆盖已有值，清空要显式 clear）' : '')
+      : manualAllow
+        ? '仍是手写白名单数组 ⇒ 2.x 新增字段会被静默过滤，保存后又被轮询弹回（#79 原样）'
+        : '没认出白名单写法，需要人读 POST /api/bili-duty/config',
+    ok: derivesFromDefaults ? true : manualAllow ? false : null,
+  })
+
+  // B7 计数口径：reportLevel=off 时数什么？（#80：没有报告可数 ⇒ 恒 0 ⇒ perDay 闸门失效）
+  const cpBody = fnBody(src, 'countPickedToday')
+  const seenWhenOff = cpBody ? /reportLevel[^\n]*['"]off['"]/.test(cpBody) && /parseSeenTable\s*\(/.test(cpBody) : null
+  checks.push({
+    id: 'B7',
+    title: 'reportLevel=off 时的当日计数来源',
+    detail: seenWhenOff === true
+      ? '「不写日报」档会退一步去 seen.md 数当天挑中的行 ⇒ perDay 闸门仍然成立'
+      : seenWhenOff === false
+        ? '只数报告文件 ⇒ 不写日报时恒 0 ⇒ perDay 闸门失效，一天能挑到上限的两倍（#80 原样）'
+        : '找不到 countPickedToday，需要人读',
+    ok: seenWhenOff,
+  })
+  const hasManualExtra = /manualExtra/.test(src)
+  checks.push({
+    id: 'B7b',
+    title: '手动轮是否按「额外的一次」单独记账（参照项）',
+    detail: hasManualExtra
+      ? '有 manualExtra ⇒ 自动额度只扣自动轮挑的，手动轮不会被算成超额度'
+      : '没有 manualExtra ⇒ 手动轮挑的会挤占当天自动额度（#80 的附带问题）',
+    ok: null,
+  })
+
   const judged = checks.filter((c) => c.ok !== null)
   const passed = judged.filter((c) => c.ok).length
   const failed = judged.filter((c) => c.ok === false).length
   const verdict = !judged.length
     ? { code: 'UNKNOWN', label: '判定器没认出任何一条，需要人读源码' }
     : failed === 0
-      ? { code: 'FIXED', label: '三处 bug 对应的代码路径都已改掉（B2 若标 · 表示只剩「整份写回」这条尾巴）' }
+      ? { code: 'FIXED', label: '所有结论项都过了（标 · 的是参照项：单看它会误判，必须配合结论项）' }
       : passed === 0
-        ? { code: 'DEFECT', label: '三处 bug 都能在源码里对上 ⇒ 装完直接用不了' }
+        ? { code: 'DEFECT', label: '全部结论项都能在源码里对上 ⇒ 装完直接用不了' }
         : { code: 'PARTIAL', label: `还有 ${failed} 条没修（见 ❌ 项）` }
   return { checks, verdict, judged, passed, failed }
 }
@@ -145,6 +224,23 @@ const FIXTURE = {
     '  return clampPatch(out)',
     '}',
     'const saveCfg = (patch) => { Object.assign(cfg, normalize(patch, cfg)); writeJson(cfgFile, cfg) }',
+    "// #78 判重表：固定列位取 BV，日期不宽松，坏行静默丢",
+    "for (const line of text.split('\\n')) {",
+    "  if (!line.startsWith('|')) continue",
+    "  const cells = line.split('|').map((x) => x.trim())",
+    "  if (cells.length < 4) continue",
+    "  const bvid = cells[1]; const day = cells[2]; const status = cells[3]",
+    "  out.push({ day, bvid, status })",
+    "}",
+    "// #79 白名单是手写的固定数组，2.x 新增字段进不来",
+    "const ALLOW = ['perDay', 'peakValley', 'noon', 'night', 'keywords']",
+    "const patch = {}; for (const k of ALLOW) { if (k in body) patch[k] = body[k] }",
+    "// #80 只数报告文件：不写日报时恒 0",
+    "const countPickedToday = (now = new Date()) => {",
+    "  const st = readJson(dutyStateFile, {})",
+    "  const fromState = st.day === dayKey(now) ? Number(st.picked || 0) : 0",
+    "  return Math.max(fromState, countPicks(reportFileOf(now)))",
+    "}",
     "const roots = process.resourcesPath ? [",
     "  ['app.asar.unpacked', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'],",
     "  ['app', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'],",
@@ -164,6 +260,33 @@ const FIXTURE = {
     'const saveCfg = (patch) => { Object.assign(cfg, normalize(patch, cfg)); writeJson(cfgFile, { ...cfg, _set: [...touchedKeys] }) }',
     "const findDshCli = () => { const req = createRequire(import.meta.url); scanForDsh(process.resourcesPath, 0, { n: 0 }) }",
     "for (const id of ['credentials', 'authorization', 'deepseek-account']) yml.push('- id: ' + id, '  disabled: false', '')",
+    "// #78 修好形：BV 扫描定位 + 日期宽松 + 坏行计数",
+    "for (const raw of text.split('\\n')) {",
+    "  const line = raw.trim()",
+    "  if (!line.startsWith('|')) continue",
+    "  const cells = line.split('|').map((x) => x.trim())",
+    "  const c = cells.slice(1, cells.length - 1)",
+    "  const bvIdx = c.findIndex((x) => /^BV[0-9A-Za-z]{10}$/.test(x))",
+    "  if (bvIdx < 0) continue",
+    "  const day = seenDay(c[bvIdx - 1])",
+    "  if (!day) { bad++; continue }",
+    "}",
+    "if (bad !== seenBadDays) { seenBadDays = bad; log('判重表有 ' + bad + ' 行日期认不出来') }",
+    "// #79 修好形：白名单从 DEFAULTS 推导 + 空值保护",
+    "const patch = {}; for (const k of Object.keys(DEFAULTS)) { if (k in body) patch[k] = body[k] }",
+    "const clears = Array.isArray(body && body.clear) ? body.clear : []",
+    "const isBlank = (v) => v === '' || (Array.isArray(v) && v.length === 0)",
+    "// #80 修好形：不写日报时回退数 seen.md；手动轮单独记账",
+    "const countPickedToday = (now = new Date()) => {",
+    "  const st = readJson(dutyStateFile, {})",
+    "  const fromState = st.day === dayKey(now) ? Number(st.picked || 0) : 0",
+    "  let fromSeen = 0",
+    "  if (String(cfg.reportLevel || 'full') === 'off') {",
+    "    fromSeen = parseSeenTable().filter((r) => r.day === today && r.picked).length",
+    "  }",
+    "  return Math.max(fromState, countPicks(reportFileOf(now)), fromSeen)",
+    "}",
+    "const autoPickedToday = (now) => Math.max(0, countPickedToday(now) - Number(readJson(dutyStateFile, {}).manualExtra || 0))",
   ].join('\n'),
 }
 
@@ -174,6 +297,16 @@ function selftest() {
     ['缺陷版（报告里那段代码的形状）', buggy.verdict.code, 'DEFECT'],
     ['修复版（row.value + 有界递归 + overlay 重开）', fixed.verdict.code, 'FIXED'],
   ]
+  // 逐条断言：只看总判可能被「别处凑巧通过」骗过去，所以每条结论项都要正反两面都对
+  const byId = (r, id) => (r.checks.find((c) => c.id === id) || {}).ok
+  for (const id of ['B1', 'B1b', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7']) {
+    cases.push([`缺陷版 ${id} 判不通过`, byId(buggy, id), false])
+  }
+  // B2 是参照项：2.5.0 写回仍带整份 cfg，只是多了 _set 来源标记 ⇒ 修好版也该是 ·（null）
+  for (const id of ['B1', 'B1b', 'B3', 'B4', 'B5', 'B6', 'B7']) {
+    cases.push([`修复版 ${id} 判通过`, byId(fixed, id), true])
+  }
+  cases.push(['修复版 B2 仍是参照项（·）', byId(fixed, 'B2'), null])
   let bad = 0
   console.log('自检：判定器对两份合成源码的结论（能分辨才算数）\n')
   for (const [name, got, want] of cases) {
