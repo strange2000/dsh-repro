@@ -1,5 +1,7 @@
 # bili-0003：桌面版装完直接用不了的三处 bug
 
+> [English](README.en.md) · 中文
+
 对应上游项目：[c1overzz/dsh-bili-scroll](https://github.com/c1overzz/dsh-bili-scroll)，
 完整报告在 [`../../reports/0003-dsh-bili-scroll.md`](../../reports/0003-dsh-bili-scroll.md)。
 
