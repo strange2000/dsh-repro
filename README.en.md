@@ -51,13 +51,13 @@ Grouped by upstream project. Numbers are stable; links survive any reshuffling.
 | No. | Upstream | Root cause in one line | Evidence / material | Status |
 |---|---|---|---|---|
 | 0015 | [#1968](https://github.com/zhu1090093659/dsh-web/issues/1968) / [#1969](https://github.com/zhu1090093659/dsh-web/issues/1969) | The dsh-market.com edge relay intermittently answers 503 `relay storage unavailable` while `relay.state` still reports `running`; a phone boot pulls 111 front-end modules and one failure stops the bootloader from switching pages → stuck on `Loading plugins…` forever. The criterion is a same-path concurrency control: 6 concurrent 111/111 pass, then serial 22/111 fail (17 `relay storage unavailable`, 5 empty), while a throwaway `*.trycloudflare.com` tunnel passes 111/111 | — (listed only) | closed |
-| 0016 | [#1954](https://github.com/zhu1090093659/dsh-web/issues/1954) / [#1955](https://github.com/zhu1090093659/dsh-web/issues/1955) | `packages/dsh-session-archive` claims the shared `settings.section` cell id `archived-sessions` (priority 0) and swallows the collision in `try/catch` → a third-party archive plugin loses its entire settings page with **zero** notice, leaving only a startup `Uncaught Error`. An id can have one registrant per list slot; whoever registers first owns it | — (listed only; the other side of 0017) | closed |
+| 0016 | [#1954](https://github.com/zhu1090093659/dsh-web/issues/1954) / [#1955](https://github.com/zhu1090093659/dsh-web/issues/1955) | `packages/dsh-session-archive` claims the shared `settings.section` cell id `archived-sessions` (priority 0) and swallows the collision in `try/catch` → a third-party archive plugin loses its entire settings page with **zero** notice, leaving only a startup `Uncaught Error`. An id can have one registrant per list slot; whoever registers first owns it | [reports/0004](reports/0004-settings-section-shared-id.md) · [scanner](repro/settings-sections/README.en.md) (the other side of 0017) | closed |
 
 ### MichengAI/dsh-archive-manager
 
 | No. | Upstream | Root cause in one line | Evidence / material | Status |
 |---|---|---|---|---|
-| 0017 | [#91](https://github.com/MichengAI/dsh-archive-manager/issues/91) | The other side of the same collision: the plugin registers `settings.section` with no conflict guard, hits the same id at the same priority, throws `Uncaught Error`, and **aborts its own client initialisation** (so its own settings page is broken too). Together the pair shows shared ids need defence on both sides | — (listed only; the other side of 0016) | closed |
+| 0017 | [#91](https://github.com/MichengAI/dsh-archive-manager/issues/91) | The other side of the same collision: the plugin registers `settings.section` with no conflict guard, hits the same id at the same priority, throws `Uncaught Error`, and **aborts its own client initialisation** (so its own settings page is broken too). Together the pair shows shared ids need defence on both sides | [reports/0004](reports/0004-settings-section-shared-id.md) · [scanner](repro/settings-sections/README.en.md) (the other side of 0016) | closed |
 
 ### GDWhisper/dsh-ntr
 
