@@ -1,0 +1,23 @@
+name: repro
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 审计器的 --selftest（合成 fixture，离线可跑）+ 中英索引行数 + 相对链接
+      - name: 自检
+        run: node tools/check-repro.cjs --verbose
