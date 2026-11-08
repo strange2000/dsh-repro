@@ -4,6 +4,14 @@
 > 状态：三处都已在本地 `node_modules` 里改通并实测跑完整轮（挑 5 条、写出 `out/<日期>.md`、追加 `seen.md`）
 > 下面每条都给了「症状 / 根因（带行号）/ 最小改法 / 如何验证」，可以直接照着改
 
+<!-- tl;dr-en -->
+> **English TL;DR**
+> - Three bugs make `dsh-bili-scroll` 0.1.7 unusable right after install on DSH NEXT desktop 2.0.19-next (Windows): scan-to-login does nothing, settings toggles flip back, and headless duty runs cannot find credentials.
+> - Bug 1: `loadCfg()` bases on the host's startup snapshot, which drops the non-scalar `pythonPath`, so it falls back to the bare `python` — the Microsoft Store stub on Windows (exit 9009) — and `renderQrPng()` swallows that non-zero exit, so no QR code ever renders.
+> - Bug 2: `saveCfg()` writes the whole in-memory `cfg` back to disk, so changing key A erases B and C; the panel, `cordis.patch.yml` and `config.json` ended up holding three different values.
+> - Bug 3: `resolveDsh()` hardcodes three `app.asar.unpacked` paths while the desktop CLI lives only inside `app.asar`, and the headless overlay disables the three services that carry credentials.
+> - Every bug below is written as symptom / root cause (with line numbers) / minimal fix / how to verify, and all three were patched locally and a full duty round was run end to end.
+
 ---
 
 ## Bug 1（严重，装完第一步就卡死）：`pythonPath` 被解析回 `'python'`，扫码永远不出图
