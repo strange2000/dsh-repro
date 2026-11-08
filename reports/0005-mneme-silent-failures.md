@@ -1,5 +1,7 @@
 # 两个不报错的缺陷：一个悄悄长大，一个把原因吞掉
 
+> [English](0005-mneme-silent-failures.en.md) · 中文
+
 <!-- tl;dr-en -->
 > **TL;DR (English)** Two mneme defects that never throw: (1) `dream_runs` has no `DELETE` path and no retention key applies to it — on this machine 92 rows hold 36.2% of the database pages (21.95 MB of 60.6 MB, `input` 12.21 MB, ~136 KB per row); 0.12.0 added an `input`-only trim, so the verdict is PARTIAL, not FIXED. (2) `locateCliJs()` hardcodes `resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js`, but DSH NEXT's asar has no top-level `dsh/` and no `dsh-desktop-host` package at all among its 340 `@deepseek-ai` packages; the real entry is `app.asar/lib/desktop-cli.js`. The child therefore dies before it can print a stack, which is why the only symptom is `headless exit code 1: (no output)`. Both are judged by read-only auditors, and both verdicts were produced by scripts that self-check first.
 

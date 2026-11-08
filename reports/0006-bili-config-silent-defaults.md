@@ -1,5 +1,7 @@
 # 存下去了，但没生效：三个各自正确的「静默降级」
 
+> [English](0006-bili-config-silent-defaults.en.md) · 中文
+
 <!-- tl;dr-en -->
 > **TL;DR (English)** Three separate issues in one plugin, filed weeks apart, turn out to share one shape: a component cannot read, cannot write, or cannot count — and in every case it **silently substitutes a default for the truth**. (#78) `parseSeenTable()` accepted table rows only, so a `seen.md` written in any other layout was unreadable: not one of 100+ records parsed, the "videos it has scrolled" panel stayed empty, no error. (#79) `POST /api/bili-duty/config` rebuilt the patch from a hand-written 1.x allowlist, so 2.x fields (`dmWatch` / `favFolderId` / `personaPrompt`) were dropped on save, and the panel's 5-second poll flipped the toggle back; the same save also carried `{"keywords":[]}`, wiping the user's keyword list. (#80) With `reportLevel=off` there is no report file to count, so `countPickedToday()` returned 0 forever, the `perDay` gate never fired, and a limit of 5 produced 10 picks in a day while the panel still showed 0. Diagnostic proof for #79 was differential: the MCP `bili_config` tool bypassed the whitelist, so on the same machine the tool could write and the panel could not. All three are fixed as of 2.5.0 (auditor verdict FIXED, 7/7 decisive items); the residual is that `saveCfg()` still writes the whole in-memory object, which `_set` and `local-override.json` intercept but do not remove.
 
