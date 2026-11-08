@@ -5,7 +5,9 @@
 Upstream project: [c1overzz/dsh-bili-scroll](https://github.com/c1overzz/dsh-bili-scroll).
 The full report is in [`../../reports/0003-dsh-bili-scroll.md`](../../reports/0003-dsh-bili-scroll.md).
 
-The three bugs are independent, but each one blocks "usable for the first time":
+The three bugs are independent, but each one blocks "usable for the first time".
+
+> **This auditor covers more than those three.** Three later issues — [#78](https://github.com/c1overzz/dsh-bili-scroll/issues/78) (the seen-table cannot be read), [#79](https://github.com/c1overzz/dsh-bili-scroll/issues/79) (saved settings that never take effect), [#80](https://github.com/c1overzz/dsh-bili-scroll/issues/80) (the perDay cap stops working) — each have their own decision item, B5–B7. Same person, same workflow; they just bite *after* the plugin works.
 
 | # | Symptom | Root cause in one line |
 |---|---|---|
@@ -21,7 +23,7 @@ node audit-config.cjs --plugin <plugin dir>
 node audit-config.cjs --state <state dir> # defaults to ~/.dsh/bili-duty
 node audit-config.cjs --patch <cordis.patch.yml>
 node audit-config.cjs --json
-node audit-config.cjs --selftest         # validate the decision function first (offline)
+node audit-config.cjs --selftest         # validate the decision function first (offline, 18 assertions)
 ```
 
 It does not start the plugin, does not run a round, and does not modify any config. It reads sources, reads three state files, and probes for paths (existence only).
@@ -37,6 +39,10 @@ It does not start the plugin, does not run a round, and does not modify any conf
 | B2 | does `saveCfg()` write the whole object back | `writeJson(cfgFile, cfg)`, no provenance marker | patch-only writes, or a `_set` provenance marker |
 | B3 | how it locates the `dsh` CLI | three hardcoded candidates (`app.asar.unpacked` / `app` / `node_modules`) | resolver + npm global + bounded recursion over the app directory |
 | B4 | does the overlay re-enable the three services | `credentials`/`authorization`/`deepseek-account` still `disabled: true` | all three set to `disabled: false` |
+| B5 | how the seen-table is parsed (#78) | assumes the BV sits in a fixed column and the date matches one format; bad rows are dropped silently | BV located by `findIndex`, dates through a lenient `seenDay()`, bad rows counted and `log`ged |
+| B6 | the `POST /config` allowlist (#79) | a hand-written `ALLOW` array ⇒ new 2.x fields are filtered out silently | derived from `Object.keys(DEFAULTS)` ⇒ a new field is allowed automatically; plus a blank guard (clearing requires an explicit `clear`) |
+| B7 | what gets counted when `reportLevel=off` (#80) | only report files are counted ⇒ always 0 without a report ⇒ the perDay gate is void | falls back to counting today's picked rows in `seen.md` |
+| B7b | is a manual round accounted separately (#80 side effect) | picks from a manual round eat into the automatic quota | `manualExtra` is tracked separately and subtracted by `autoPickedToday()` |
 
 `·` means reference-only and excluded from the verdict (for example B2's `_set`: it is not a root fix, but it does block the "stale keys written back and read again" cycle).
 
@@ -55,12 +61,16 @@ plugin version: 2.5.0
   · [B2]   still writes the whole cfg, but with a _set marker (partial mitigation, not a root fix)
   ✅ [B3]  resolver + npm global + bounded recursion over the app directory
   ✅ [B4]  all three ids set disabled: false
-  subtotal: 4/4 decisive items pass → FIXED
+  ✅ [B5]  BV located by findIndex + lenient seenDay parsing + bad-row counter
+  ✅ [B6]  allowlist derived from Object.keys(DEFAULTS) + blank guard
+  ✅ [B7]  falls back to counting seen.md when no report is written
+  · [B7b] manualExtra present (manual rounds accounted separately)
+  subtotal: 7/7 decisive items pass → FIXED
 
 3. pythonPath: …\\bili-duty\\.venv\\Scripts\\python.exe (exists) → OK
 2. three-way comparison: perDay / peakValley / autoComment / dmMode / pythonPath / workspace / replyToComments all agree
 ```
 
-So all three bugs are fixed as of 2.5.0 on this machine. The one loose end is B2's whole-object write — intercepted by `_set` plus `local-override.json`, but the write path itself was never narrowed to "patch only".
+So **all six filed issues (0003's three plus #78/#79/#80) are fixed as of 2.5.0** on this machine. The one loose end is B2's whole-object write — intercepted by `_set` plus `local-override.json`, but the write path itself was never narrowed to "patch only".
 
 One fact that still holds upstream: the install that filed the issue came **from the plugin marketplace** and delivered `0.1.7`, while GitHub main was already at `0.1.10` — meaning anyone installing from the marketplace reliably hits bugs that were already fixed. A "published package behind the source" gap hurts more than the bug itself, and reproduction material is what lets the two be told apart.

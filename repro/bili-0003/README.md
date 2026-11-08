@@ -5,7 +5,9 @@
 对应上游项目：[c1overzz/dsh-bili-scroll](https://github.com/c1overzz/dsh-bili-scroll)，
 完整报告在 [`../../reports/0003-dsh-bili-scroll.md`](../../reports/0003-dsh-bili-scroll.md)。
 
-三处 bug 各自独立，但都挡在「第一次能用」之前：
+三处 bug 各自独立，但都挡在「第一次能用」之前。
+
+> **这个审计器不只判这三处。** 后续报过的 [#78](https://github.com/c1overzz/dsh-bili-scroll/issues/78)（判重表读不出来）、[#79](https://github.com/c1overzz/dsh-bili-scroll/issues/79)（面板存了等于没存）、[#80](https://github.com/c1overzz/dsh-bili-scroll/issues/80)（perDay 上限失效）也各有一条判定项，分在 B5–B7。它们和上面三条是同一个人的同一套用法撞出来的，只是发生在「用起来之后」。
 
 | # | 症状 | 根因一句话 |
 |---|---|---|
@@ -21,7 +23,7 @@ node audit-config.cjs --plugin <插件目录>
 node audit-config.cjs --state <状态目录>   # 默认 ~/.dsh/bili-duty
 node audit-config.cjs --patch <cordis.patch.yml>
 node audit-config.cjs --json
-node audit-config.cjs --selftest         # 先验证判定器本身可信（离线）
+node audit-config.cjs --selftest         # 先验证判定器本身可信（离线，18 条断言）
 ```
 
 不启动插件、不跑一轮、不改任何配置。只读源码 + 只读三份状态文件 + 只读探路（文件在不在）。
@@ -37,6 +39,10 @@ node audit-config.cjs --selftest         # 先验证判定器本身可信（离�
 | B2 | `saveCfg()` 是否整份写回 | `writeJson(cfgFile, cfg)`，无来源标记 | 只写 patch / 带 `_set` 来源标记 |
 | B3 | 找 dsh 的策略 | 三条硬编码（`app.asar.unpacked` / `app` / `node_modules`） | 解析器 + npm 全局 + 应用目录有界递归 |
 | B4 | overlay 是否重开三服务 | `credentials`/`authorization`/`deepseek-account` 仍 `disabled: true` | 三条都写 `disabled: false` |
+| B5 | 判重表怎么解析（#78） | 假设 BV 固定在某列、日期照格式硬解，坏行静默丢 | BV 用 `findIndex` 扫描定位，日期走 `seenDay()` 宽松解析，坏行计数并 `log` |
+| B6 | `POST /config` 的白名单（#79） | 手写 `ALLOW` 数组 ⇒ 2.x 新增字段被静默过滤 | 从 `Object.keys(DEFAULTS)` 推导 ⇒ 加一项就自动放行；另带空值保护（清空要显式 `clear`） |
+| B7 | `reportLevel=off` 时数什么（#80） | 只数报告文件 ⇒ 不写日报时恒 0 ⇒ perDay 闸门失效 | 退一步去 `seen.md` 数当天挑中的行 |
+| B7b | 手动轮是否单独记账（#80 附带） | 手动轮挑的挤占当天自动额度 | `manualExtra` 单列，`autoPickedToday()` 扣掉它 |
 
 `·` 表示仅供参照、不参与结论（比如 B2 的 `_set`：它不是根治，但确实挡住了「陈旧键被写回又被读回」这一环）。
 
@@ -55,12 +61,16 @@ node audit-config.cjs --selftest         # 先验证判定器本身可信（离�
   · [B2]   仍写整份 cfg，但带 _set 来源标记（部分缓解，不是根治）
   ✅ [B3]  解析器 + npm 全局 + 应用目录有界递归
   ✅ [B4]  三个 id 都写了 disabled: false
-  小计：4/4 项通过 → FIXED
+  ✅ [B5]  BV 用 findIndex 扫描定位 + seenDay 宽松解析 + 坏行计数
+  ✅ [B6]  白名单从 Object.keys(DEFAULTS) 推导 + 空值保护
+  ✅ [B7]  不写日报时回退数 seen.md
+  · [B7b] 有 manualExtra（手动轮单独记账）
+  小计：7/7 项通过 → FIXED
 
 三、pythonPath：…\bili-duty\.venv\Scripts\python.exe（存在）→ OK
 二、三方对照：perDay / peakValley / autoComment / dmMode / pythonPath / workspace / replyToComments 全一致
 ```
 
-即：三处 bug 在本机 2.5.0 上都已修掉，唯一留着的尾巴是 B2 的「整份写回」——被 `_set` 与 `local-override.json` 两层挡住，但写路径本身没改成「只写 patch」。
+即：**六条已报问题（0003 的三处 + #78/#79/#80）在本机 2.5.0 上全部修掉**，唯一留着的尾巴是 B2 的「整份写回」——被 `_set` 与 `local-override.json` 两层挡住，但写路径本身没改成「只写 patch」。
 
 顺带一条对上游仍然成立的事实：报 issue 那次是**通过插件市场**装的，拿到的是 `0.1.7`，而当时 GitHub main 已经 `0.1.10` —— 也就是说「从市场装的人」会稳定命中已经修好的 bug。这类「发布的版本落后于源码」的问题比 bug 本身更伤，复现材料的价值就在于能把两件事分开讲清楚。
