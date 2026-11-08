@@ -4,6 +4,8 @@
 > 状态：三处都已在本地 `node_modules` 里改通并实测跑完整轮（挑 5 条、写出 `out/<日期>.md`、追加 `seen.md`）
 > 下面每条都给了「症状 / 根因（带行号）/ 最小改法 / 如何验证」，可以直接照着改
 
+> [English](0003-dsh-bili-scroll.en.md) · 中文
+
 <!-- tl;dr-en -->
 > **English TL;DR**
 > - Three bugs make `dsh-bili-scroll` 0.1.7 unusable right after install on DSH NEXT desktop 2.0.19-next (Windows): scan-to-login does nothing, settings toggles flip back, and headless duty runs cannot find credentials.
