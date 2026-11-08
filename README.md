@@ -34,10 +34,10 @@
 
 | 编号 | 上游 issue | 一句话根因 | 判据 / 材料 | 状态 |
 |---|---|---|---|---|
-| 0003 | [#47](https://github.com/c1overzz/dsh-bili-scroll/issues/47) | `pythonPath` 被宿主启动快照压回 `"python"`（商店存根 exit 9009）/ `saveCfg` 整份写回 / 桌面版 CLI 只在 `app.asar` 内 + headless overlay 关了三服务 | [`repro/bili-0003/`](repro/bili-0003/) 只读审计（6 项判定）｜[报告](reports/0003-dsh-bili-scroll.md) | open |
-| 0011 | [#78](https://github.com/c1overzz/dsh-bili-scroll/issues/78) | `parseSeenTable()` 只认表格行，而章程没规定 `seen.md` 的写法 ⇒ 一百多条记录一条也读不出来，面板「它刷过的视频」恒空 | [审计器 B5](repro/bili-0003/README.md) | closed |
-| 0012 | [#79](https://github.com/c1overzz/dsh-bili-scroll/issues/79) | `POST /api/bili-duty/config` 按一张 1.x 时代的白名单重建 patch，2.0 新增字段（`dmWatch` / `favFolderId` / `personaPrompt`）被静默过滤 ⇒ 面板保存后 5 秒轮询把开关弹回；每次保存还附带 `{"keywords":[]}` 清空关键词。反证：MCP `bili_config` 不经白名单，同一台机器上工具能写、面板写不进 | [审计器 B6](repro/bili-0003/README.md) | closed |
-| 0013 | [#80](https://github.com/c1overzz/dsh-bili-scroll/issues/80) | 「不写日报」档（`reportLevel=off`）下 `countPickedToday()` 只数报告文件 ⇒ 恒 0 ⇒ `perDay` 闸门永不成立；唯一保底只约束定时窗口，`runDuty('manual')` 不受约束 ⇒ 上限 5 的一天挑到 10 条，面板 `pickedToday` 还显示 0 | [审计器 B7](repro/bili-0003/README.md) | closed |
+| 0003 | [#47](https://github.com/c1overzz/dsh-bili-scroll/issues/47) | `pythonPath` 被宿主启动快照压回 `"python"`（商店存根 exit 9009）/ `saveCfg` 整份写回 / 桌面版 CLI 只在 `app.asar` 内 + headless overlay 关了三服务 | [`repro/bili-0003/`](repro/bili-0003/) 只读审计（8 项判定 + 1 参照）｜[报告](reports/0003-dsh-bili-scroll.md) | open |
+| 0011 | [#78](https://github.com/c1overzz/dsh-bili-scroll/issues/78) | `parseSeenTable()` 只认表格行，而章程没规定 `seen.md` 的写法 ⇒ 一百多条记录一条也读不出来，面板「它刷过的视频」恒空 | [审计器 B5](repro/bili-0003/README.md)｜[报告 0006](reports/0006-bili-config-silent-defaults.md) | closed |
+| 0012 | [#79](https://github.com/c1overzz/dsh-bili-scroll/issues/79) | `POST /api/bili-duty/config` 按一张 1.x 时代的白名单重建 patch，2.0 新增字段（`dmWatch` / `favFolderId` / `personaPrompt`）被静默过滤 ⇒ 面板保存后 5 秒轮询把开关弹回；每次保存还附带 `{"keywords":[]}` 清空关键词。反证：MCP `bili_config` 不经白名单，同一台机器上工具能写、面板写不进 | [审计器 B6](repro/bili-0003/README.md)｜[报告 0006](reports/0006-bili-config-silent-defaults.md) | closed |
+| 0013 | [#80](https://github.com/c1overzz/dsh-bili-scroll/issues/80) | 「不写日报」档（`reportLevel=off`）下 `countPickedToday()` 只数报告文件 ⇒ 恒 0 ⇒ `perDay` 闸门永不成立；唯一保底只约束定时窗口，`runDuty('manual')` 不受约束 ⇒ 上限 5 的一天挑到 10 条，面板 `pickedToday` 还显示 0 | [审计器 B7](repro/bili-0003/README.md)｜[报告 0006](reports/0006-bili-config-silent-defaults.md) | closed |
 | 0014 | [#82](https://github.com/c1overzz/dsh-bili-scroll/issues/82) | 建议类：值班轮子进程 `cwd` 写死插件家（`const cwd = stateDir`）⇒ 它开的会话全落「未分组」；而 `WorkspaceRegistry.candidateMatches()` 要求 `realpath(header.cwd) === 工作区 path`，事后改 `workspace.json` 会被下次启动过滤掉，所以只能靠 cwd 落对位置（作者自带 workaround：`sessionWorkspace` 键 + spawn 时给 `danger-full-access` + 启动 8 秒后收编扫描） | —（仅登记） | open |
 
 ### Ebony-Vinyl/dsh-our-free-model
