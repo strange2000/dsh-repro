@@ -22,6 +22,13 @@
 | 编号 | 上游 issue | 一句话根因 | 判据 / 材料 | 状态 |
 |---|---|---|---|---|
 | 0001 | [#493](https://github.com/slow-stack/mneme/issues/493) | 转录裸放 user 消息，模型当成「该我回话了」；解析失败后确定性重试同一窗口 | [`repro/mneme-0001/`](repro/mneme-0001/) 取证脚本 + 三臂对照实验｜[报告](reports/0001-mneme-summarize-invalid-json.md) | closed |
+| 0004 | [#534](https://github.com/slow-stack/mneme/issues/534) | dream 决策层两层账不一致：run 层 19 轮里 17 轮校验期整轮失效、2 轮 `ok` 但 `applied=0`（200 条全 `keep`），而 LLM 审计层记 18 success ⇒ 按审计统计会得出「成功率 95%」的相反结论；失败轮不落原始决策 | —（仅登记） | closed |
+| 0005 | [#553](https://github.com/slow-stack/mneme/issues/553) | `MemoryDrawer` 的 useState 区漏了 `provenance`（`lib/client.js:6484`），但组件内在 `:6522` 就调 `setProvenance(null)` ⇒ 打开记忆详情必崩 `ReferenceError: provenance is not defined`，渲染进程挂掉、DSH 重启，100% 复现 | —（仅登记） | closed |
+| 0006 | [#557](https://github.com/slow-stack/mneme/issues/557) | `dream_runs` 是全库唯一没有 DELETE 路径的表（`lib/store.js` 只清理 `recall_runs` / `llm_audit_logs`），四个 `*RetentionDays` 也都不覆盖它；实测占库约 43% 的页、`input` 平均 79 KB/轮，且单行体积×轮数双涨 = 超线性，还会成倍放大每张热快照 | —（仅登记） | open |
+| 0007 | [#578](https://github.com/slow-stack/mneme/issues/578) | `locateCliJs()`（`lib/wiki/t1.js:110`）硬编码 `resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js`；DSH NEXT 的 asar 顶层没有 `dsh/` 这一层，真正的 headless 入口是 `app.asar/lib/desktop-cli.js` ⇒ T1 必失败，且只报「headless 退出码 1：(无输出)」，子进程根本没起来所以自查成本极高 | —（仅登记） | open |
+| 0008 | [#579](https://github.com/slow-stack/mneme/issues/579) | `choro_module_map` / `choro_read_page` / `choro_search` 的错误分支直接 `return { error, hint }`，而三者都声明了 `additionalProperties: false` 的强 schema ⇒ 宿主一律判 `invalid output`，用户看不到真实原因（没登记 / 多仓库歧义 / 页不存在） | —（仅登记） | closed |
+| 0009 | [#581](https://github.com/slow-stack/mneme/issues/581) | 仓库身份拿本机绝对路径当键（`lib/wiki/t0.js:47` 存 `realpathSync(resolve(repoRoot))`，T1 在 `t1.js:239` 要求逐字符相同）⇒ 双系统共用一个 `memory.db` 时地志无法跨端复用；在另一端再跑一次 T0 就多一条记录，从此不带 `repo` 调用即 `repo-ambiguous`（而它的错误载荷又不合 schema，见 0008） | —（仅登记） | open |
+| 0010 | [#582](https://github.com/slow-stack/mneme/issues/582) | `dsh-mneme-wiki` 自带的手写迷你渲染器把 `\|` 开头的行只做成等宽 `div`（`lib/client.js:10227` + `.mneme-wikitablerow` 的 `white-space:pre`）、不剥 `<!-- CHORO:T1:START -->` 这类 HTML 注释、front matter 的 `status` 在 T1 后不回写（库里 `choro_pages` 已 `enriched`、页面仍是 `skeleton`）⇒ 模块页上看到的是 Markdown 源码而不是排版后的页面 | —（仅登记） | open |
 
 ### c1overzz/dsh-bili-scroll
 
