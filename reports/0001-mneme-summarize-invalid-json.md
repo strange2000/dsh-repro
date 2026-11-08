@@ -1,5 +1,7 @@
 # mneme 0.9.3：同一窗口被确定性重试 20 次（`invalid summary JSON`）
 
+> [English](0001-mneme-summarize-invalid-json.en.md) · 中文
+
 <!-- tl;dr-en -->
 > **English TL;DR**
 > - `@modusensus/dsh-mneme@0.9.3` failed `summarize_compress` 20 times on **one and the same** conversation window (`invalid summary JSON`), spread over ~3.5 h — it looks like constant breakage, but it is a single window retried deterministically.

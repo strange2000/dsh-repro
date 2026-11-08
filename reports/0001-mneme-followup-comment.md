@@ -1,5 +1,7 @@
 ## 与 #424 的关系：这是「失败重试」的另一半
 
+> [English](0001-mneme-followup-comment.en.md) · 中文
+
 <!-- tl;dr-en -->
 > **English TL;DR**
 > - This is a follow-up comment on #424, not a duplicate: #424 covers *transient* failures (429 / 5xx / timeout) where a retry usually succeeds.
