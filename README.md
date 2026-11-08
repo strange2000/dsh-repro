@@ -46,16 +46,27 @@
 |---|---|---|---|---|
 | 0002 | [#427](https://github.com/Ebony-Vinyl/dsh-our-free-model/issues/427) | 宿主暴露不出可枚举 ESM 缓存 ⇒ `purgeCaches` 清 0 个 ⇒ 兜底 `import()` 的 query 被 loader 规范化掉 ⇒ 拿到旧模块 ⇒ 版本断言 throw ⇒ updater 把「热激活失败」当「升级失败」而 `restoreBackup()` | [`repro/ofm-0002/`](repro/ofm-0002/) 只读审计（A/C 为结论项）｜[报告](reports/0002-dsh-our-free-model.md) | closed |
 
+### zhu1090093659/dsh-web
+
+| 编号 | 上游 issue | 一句话根因 | 判据 / 材料 | 状态 |
+|---|---|---|---|---|
+| 0015 | [#1968](https://github.com/zhu1090093659/dsh-web/issues/1968) / [#1969](https://github.com/zhu1090093659/dsh-web/issues/1969) | dsh-market.com 边缘中继间歇返回 503 `relay storage unavailable`，而 `relay.state` 仍报 `running`；手机启动要拉 111 个前端模块，任一失败启动器就不切页 ⇒ 永久停在 `Loading plugins…`。判据是**同一路径、同 111 个 URL 的并发对照**：6 并发 111/111 通过，紧接着串行 22/111 失败（17 条 `relay storage unavailable` + 5 条空响应），临时 `*.trycloudflare.com` 隧道 111/111 通过 | —（仅登记） | closed |
+| 0016 | [#1954](https://github.com/zhu1090093659/dsh-web/issues/1954) / [#1955](https://github.com/zhu1090093659/dsh-web/issues/1955) | `packages/dsh-session-archive` 抢占 `settings.section` 的共享 cell id `archived-sessions`（priority 0）并用 `try/catch` 静默兜底 ⇒ 第三方归档插件在**零提示**下整块丢失设置页，只留一条启动期 `Uncaught Error`；名字相同的 id 在同一个 list slot 上只能有一个注册方，谁先注册谁独占 | —（仅登记，与 0017 是同一冲突的两侧） | closed |
+
+### MichengAI/dsh-archive-manager
+
+| 编号 | 上游 issue | 一句话根因 | 判据 / 材料 | 状态 |
+|---|---|---|---|---|
+| 0017 | [#91](https://github.com/MichengAI/dsh-archive-manager/issues/91) | 同一冲突的另一侧：插件注册 `settings.section` 时不做冲突防护，撞上同 id 同 priority 直接抛 `Uncaught Error`，并**中断自身 client 初始化**（所以它自己的设置页也打不开）。这一对说明「共享 id」需要注册方与消费者双向防守 | —（仅登记，与 0016 是同一冲突的两侧） | closed |
+
 ### 整理中（已报、待入库）
 
 这几个项目的 issue 还没整理进上表，先列在这里，免得看起来像没报过：
 
 | 项目 | 已报 | 状态 |
 |---|---|---|
-| [zhu1090093659/dsh-web](https://github.com/zhu1090093659/dsh-web) | #1968 / #1969 中继 503；#1954 / #1955 `settings.section` id 被抢占 | 全 closed |
 | [anywhere-labs/dsh-desktop](https://github.com/anywhere-labs/dsh-desktop) | #1574 空闲反复退出；#1532 市场永久「新版等待中」 | 全 closed |
 | [GDWhisper/dsh-ntr](https://github.com/GDWhisper/dsh-ntr) | #2 ACP 审批无提示挂起；#3 `mcpServers: []` 硬编码 | 全 closed |
-| [MichengAI/dsh-archive-manager](https://github.com/MichengAI/dsh-archive-manager) | #91 `settings.section` 注册冲突未防护 | closed |
 
 ## 两处补记
 
