@@ -59,14 +59,19 @@
 |---|---|---|---|---|
 | 0017 | [#91](https://github.com/MichengAI/dsh-archive-manager/issues/91) | 同一冲突的另一侧：插件注册 `settings.section` 时不做冲突防护，撞上同 id 同 priority 直接抛 `Uncaught Error`，并**中断自身 client 初始化**（所以它自己的设置页也打不开）。这一对说明「共享 id」需要注册方与消费者双向防守 | —（仅登记，与 0016 是同一冲突的两侧） | closed |
 
-### 整理中（已报、待入库）
+### GDWhisper/dsh-ntr
 
-这几个项目的 issue 还没整理进上表，先列在这里，免得看起来像没报过：
+| 编号 | 上游 issue | 一句话根因 | 判据 / 材料 | 状态 |
+|---|---|---|---|---|
+| 0018 | [#2](https://github.com/GDWhisper/dsh-ntr/issues/2) | NTR 模式下 agent 发起「需审批」的工具调用后，桥接层没把 ACP 的 permission 请求转成宿主审批 UI ⇒ 聊天区无审批卡、无提示、无占位，界面只表现为「一直在转」，会话永久挂起（agent 侧只剩每 30s 的内存心跳），最后只能杀进程。判据：agent 侧日志有 `[tool-permission] ASK tool=Bash mode=default`，此后无任何记录 | —（仅登记） | closed |
+| 0019 | [#3](https://github.com/GDWhisper/dsh-ntr/issues/3) | `session/new` / `session/load` 三处调用（`lib/bridge.js` L531 / L588 / L736）把 `mcpServers` **写死成 `[]`**，而 `agents.json` 的 schema（`validateAgentDef`）压根没有 mcp 字段 ⇒ 对端 agent 即使声明 `mcpCapabilities: { http: true, sse: true }` 也拿不到任何 MCP 工具。「管道已经在了，只是没接」——ACP SDK 这侧类型与校验全支持 | —（仅登记） | closed |
 
-| 项目 | 已报 | 状态 |
-|---|---|---|
-| [anywhere-labs/dsh-desktop](https://github.com/anywhere-labs/dsh-desktop) | #1574 空闲反复退出；#1532 市场永久「新版等待中」 | 全 closed |
-| [GDWhisper/dsh-ntr](https://github.com/GDWhisper/dsh-ntr) | #2 ACP 审批无提示挂起；#3 `mcpServers: []` 硬编码 | 全 closed |
+### anywhere-labs/dsh-desktop
+
+| 编号 | 上游 issue | 一句话根因 | 判据 / 材料 | 状态 |
+|---|---|---|---|---|
+| 0020 | [#1532](https://github.com/anywhere-labs/dsh-desktop/issues/1532) | Desktop 给 pnpm 注入 `pnpm_config_minimum_release_age=0`，而市场自己的「最低发布龄」判定因此返回 `unknown` 并 fail-closed ⇒ 每个待更新插件永久显示「新版等待中」、连「更新」按钮都不给。判据：`dsh-web-all` 0.4.8 → npm 0.4.11 已发布 38 小时仍不解锁。不崩不报错，极难自查 | —（仅登记） | closed |
+| 0021 | [#1574](https://github.com/anywhere-labs/dsh-desktop/issues/1574) | 空闲时 Host 进程退出、界面落进恢复模式（「插件服务进程已退出，退出码 1」），5 天 13 次；栈指向 fail-loud 路径上的 `fatal load failure` / `MeshCallError: Call deadline exceeded`（迟到的 `unhandledRejection`）。**只登记不深挖**：这是跨天偶发，没有可判定的单点判据，而 fail-loud 本身是 #1158 的设计，要等上游区分「已结束请求的迟到超时」与「真正的致命错误」 | —（仅登记） | closed |
 
 ## 两处补记
 
