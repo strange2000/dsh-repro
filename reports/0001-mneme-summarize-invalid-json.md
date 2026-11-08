@@ -1,3 +1,15 @@
+# mneme 0.9.3：同一窗口被确定性重试 20 次（`invalid summary JSON`）
+
+<!-- tl;dr-en -->
+> **English TL;DR**
+> - `@modusensus/dsh-mneme@0.9.3` failed `summarize_compress` 20 times on **one and the same** conversation window (`invalid summary JSON`), spread over ~3.5 h — it looks like constant breakage, but it is a single window retried deterministically.
+> - `finish_reason` was `stop` on every attempt (not truncation, not 429, not a timeout), and the input grew monotonically 8194 → 11118 tokens, so each retry cost more than the one before.
+> - `distill_cursors.last_seq` for that session has been stuck at 2229 since `2026-10-20T15:19:09Z` and never advanced.
+> - Root cause: two amplifying bugs — the cursor only advances on success, and nothing can mark a window as abandoned, so a deterministic failure is resubmitted forever.
+> - Minimal fix: a per-window attempt cap plus an explicit give-up state (line numbers and the patch below).
+
+---
+
 ### 现象
 
 `@modusensus/dsh-mneme@0.9.3` 的会话蒸馏（`summarize_compress`）在同一个会话窗口上连续失败 20 次，面板「工作动态」刷出一整屏相同的 `invalid summary JSON`（间隔 2–5 分钟，持续约 3.5 小时）。用户侧看起来像「记忆一直在提炼失败」。

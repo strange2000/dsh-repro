@@ -1,5 +1,13 @@
 ## 与 #424 的关系：这是「失败重试」的另一半
 
+<!-- tl;dr-en -->
+> **English TL;DR**
+> - This is a follow-up comment on #424, not a duplicate: #424 covers *transient* failures (429 / 5xx / timeout) where a retry usually succeeds.
+> - This report covers the opposite case: a **deterministic** failure where every retry reproduces the same result — `finish_reason` is `stop`, i.e. the model answered normally and the parse rejected the answer.
+> - Retry yield is exactly 0 (20 failures out of 20 on the same window) while retry cost grows: input went 8194 → 11118 tokens, monotonically.
+> - So once #424 lands, the window stuck at `last_seq=2229` will still be retried forever — in the current design "failed" only ever means "not finished yet".
+> - Suggested guardrail below: an attempt cap plus an explicit give-up state, without changing normal semantics.
+
 #424 第 4 项提的是**失败短重试**（近 7 天 102 轮里 12 轮失败，11.8%，改成一天一次后「一次失败 = 浪费一整天」）。本文描述的是它的反面情形，两者互补而非重复：
 
 | | #424 第 4 项覆盖的失败 | 本文描述的失败 |

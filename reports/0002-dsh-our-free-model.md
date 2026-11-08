@@ -1,5 +1,13 @@
 # GitHub Issue 草稿 · 精简版（正文 约 2.6K 字符，远低于 65536 上限）
 
+<!-- tl;dr-en -->
+> **TL;DR** (this file is already the English issue draft)
+> - On DSH Desktop the in-app **立即升级** button fails on **every** version and rolls the working install back.
+> - Network, signature, staging and verification are all fine: `installStaged` and `verifyInstalled` succeed — only the in-process hot reload fails.
+> - `purgeCaches` clears 0 modules (the host exposes no enumerable ESM cache), and the cache-busting query on the fallback `import()` is normalised away by the loader, so it hands back the already-evaluated old module and the version assertion throws.
+> - The updater reads "hot activation failed" as "upgrade failed" and calls `restoreBackup()`, undoing a correct install (`diskRestored: true`).
+> - Minimal fix: make activation deferrable (`{ ok: true, deferred: true }`) and ask the user to restart — omitting `activate` already works today.
+
 ## Title
 
 ```
