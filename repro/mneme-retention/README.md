@@ -2,6 +2,8 @@
 
 > [English](README.en.md) · 中文
 
+> 注：`--selftest` 的数据侧算术用 `node:sqlite`，需要 Node ≥ 22.5；更旧的 Node 上这一段会打印 `skip` 并跳过，源码侧五组判定照常跑。
+
 一条命令回答一个问题：**你这份 mneme 里，`dream_runs` 有没有人负责让它变老、变小？**
 
 对应上游 [slow-stack/mneme#557](https://github.com/slow-stack/mneme/issues/557)：0.10.1 时这张审计表没有保留期键、无界增长，实测占库约 43% 的页，而四个 `*RetentionDays` 全都不覆盖它。

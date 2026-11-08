@@ -1,5 +1,7 @@
 # mneme retention auditor · `dream_runs`
 
+
+> Note: the data-side arithmetic in `--selftest` uses `node:sqlite`, which needs Node >= 22.5. On older Node that step prints `skip` and is skipped; the five source-side cases still run.
 > 中文 · [English](README.en.md)
 
 One command answers one question: **in your build of mneme, does anything make `dream_runs` get old and small?**

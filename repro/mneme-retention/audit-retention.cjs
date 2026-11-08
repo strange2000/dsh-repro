@@ -225,6 +225,19 @@ function selftest() {
   }
 
   // 数据侧：内存库造 3 行已知大小的 dream_runs，验 measureDb 的算术
+  // node:sqlite 需要 Node ≥ 22.5（22.x 还需 --experimental-sqlite，23.4+ 默认可用）。
+  // 旧版本上没有它时跳过这一段，判为 skip 而不是失败 —— 源码侧五组仍然照跑。
+  try {
+    require('node:sqlite');
+  } catch (e) {
+    if (e.code === 'ERR_UNKNOWN_BUILTIN_MODULE') {
+      console.log(`  skip  数据侧算术：当前 Node ${process.version} 没有 node:sqlite（需 ≥ 22.5），跳过`);
+      console.log('');
+      if (fail === 0) { console.log(`自检通过：${cases.length}/${cases.length} 个用例判定正确（数据侧已跳过）。`); return 0; }
+      return 1;
+    }
+    throw e;
+  }
   const { DatabaseSync } = require('node:sqlite');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mneme-audit-'));
   const p = path.join(dir, 'mem.db');
