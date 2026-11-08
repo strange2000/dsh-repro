@@ -1,5 +1,7 @@
 # mneme-0001：总结提炼失败（invalid summary JSON）
 
+> [English](README.en.md) · 中文
+
 对应上游 issue：[slow-stack/mneme#493](https://github.com/slow-stack/mneme/issues/493)，
 完整报告在 [`../../reports/0001-mneme-summarize-invalid-json.md`](../../reports/0001-mneme-summarize-invalid-json.md)。
 

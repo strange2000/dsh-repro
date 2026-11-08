@@ -1,5 +1,7 @@
 # ofm-0002：应用内升级每次都回滚（热重载永远确认不了新版本）
 
+> [English](README.en.md) · 中文
+
 对应上游项目：[Ebony-Vinyl/dsh-our-free-model](https://github.com/Ebony-Vinyl/dsh-our-free-model)，
 完整报告在 [`../../reports/0002-dsh-our-free-model.md`](../../reports/0002-dsh-our-free-model.md)。
 
