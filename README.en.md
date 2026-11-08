@@ -83,6 +83,20 @@ Grouped by upstream project. Numbers are stable; links survive any reshuffling.
 
 **4. Reports 0004–0006 are about structure, not single bugs.** 0004 covers a shared `settings.section` id with no contract (0016 and 0017 are the two sides of one conflict); 0005 covers two defects that never throw (#557 unbounded growth, #578 swallowing the failure reason into "no output"); 0006 covers three silent degradations (cannot read → treat as absent, cannot write → treat as unchanged, cannot count → treat as zero). Each of these only holds when several issues are read together.
 
+## Repository self-check
+
+`.github/workflows/repro.yml` runs `tools/check-repro.cjs` on every push and PR. It is read-only, offline, and never modifies files — a failure only turns red. Three groups:
+
+- **Auditor self-tests** — each of the 5 auditors runs `--selftest` against synthetic fixtures (one defective shape, one fixed shape) and must pass. The ruler has to prove it can tell the two apart before its verdict means anything.
+- **Index parity** — `README.md` and `README.en.md` must have the same number of index rows (21 today), so an entry added on one side cannot be forgotten on the other.
+- **Link integrity** — every relative link in the repo must point at a file that exists.
+
+Run the same command locally to reproduce what CI sees:
+
+```bash
+node tools/check-repro.cjs
+```
+
 ## Three rules for reports
 
 1. **Read-only forensics first.** Database queries, logs, exact line numbers — never guesswork.
