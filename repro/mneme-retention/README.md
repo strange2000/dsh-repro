@@ -24,8 +24,9 @@ node audit-retention.cjs --selftest             # 合成源码 + 内存库，先
 | 项 | 判据 | 权重 |
 |---|---|---|
 | **A** `dream_runs` 本表有 `DELETE` 路径 | `DELETE FROM dream_runs` 或 `deleteOldDreamRuns` / `purgeDreamRuns` 之族 | 结论项 |
-| **B** 有保留期键落到 `dream_runs` | `dreamRunsRetentionDays` 之类 | 结论项 |
-| **C** 有「只清 `input` 列」的裁剪入口 | `UPDATE dream_runs SET input = NULL` | 结论项（决定 PARTIAL） |
+| **B** 有「删行型」保留期键落到 `dream_runs` | `dreamRunsRetentionDays` 之类 | 结论项 |
+| **B2** 有「裁列型」开关（opt-in，默认常为 0 = 不裁） | `dreamRunsTrimDays` 之类 | 结论项（决定 `OPT-IN`） |
+| **C** 有「只清 `input` 列」的裁剪入口 | `UPDATE dream_runs SET input = NULL` | 结论项（决定 PARTIAL / OPT-IN） |
 | **D** 实测行数 / 占库页比 / `input` 字节 / 时间跨度 | `dbstat` + `LENGTH(input)` | 现场证据，**不参与结论** |
 
 顺带把「现有保留期键 → 清理函数 → 目标表」三者的对应关系打印出来 —— 这才是回答「为什么四个键都不覆盖它」的地方，而不是靠读 changelog。
@@ -33,6 +34,7 @@ node audit-retention.cjs --selftest             # 合成源码 + 内存库，先
 结论三档：
 
 - `FIXED` —— 有删除路径且有保留期键（或某个 purge 函数直接指向 `dream_runs`）：表会自己变老。
+- `OPT-IN` —— 没有删除路径，但上游给了「裁列型」开关（只清 `input`/`decisions`/`outcome`，行与骨架保留）：**默认关，不开就不生效**，库仍会长；开了则窗口外老轮次的回放能力降级为骨架级。
 - `PARTIAL` —— 没有删除路径、没有保留期键，但有 `input` 裁剪：只治了最肥的那一列，行本身永久保留。
 - `DEFECT` —— 三者都没有：无界增长，与 #557 描述一致。
 - `SUSPECT` —— 有保留期键却找不到删除路径（或相反）：键可能是死的，需要人工确认调用链。
@@ -55,6 +57,17 @@ dream_runs 被覆盖：没有任何清理函数指向它
 
 结论 PARTIAL
 ```
+
+### 2026-11-14 复测（mneme `0.15.1`）→ `OPT-IN`
+
+上游对 #557 的处置是「**裁列同意、删行不同意**」：`src/config.js:1068` 新增 `dreamRunsTrimDays`（`z.natural().min(0).max(3650).default(0)`），启动期按窗口裁掉 `input`/`decisions`/`outcome` 三个重载列，行与骨架列永远保留；`organize` 行整体豁免（`input` 是 apply 的重放载荷）。代码路径：`src/maintenance.js` → `store.dreamRunInputStats()` / `store.clearDreamRunInputs()`。
+
+```
+源码侧   A MISS   B MISS   B2 ok（dreamRunsTrimDays，默认 0 = 不裁）   C ok
+结论 OPT-IN
+```
+
+**这条判定器自己错过一次**：第一版只认 `*RetentionDays` 和 `DELETE`，`dreamRunsTrimDays` 既不叫 Retention 也不是删行，于是被读成「没有任何键」——给上游已采纳的修复判了 `PARTIAL`。现在 B2 单列一项，默认值也一并打出来（`0 天 = 不裁` 是这条修复最容易被忽略的部分：不配就不生效）。
 
 三件值得注意的事：
 

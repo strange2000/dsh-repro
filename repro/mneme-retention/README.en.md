@@ -24,13 +24,14 @@ Zero dependencies, read-only: sources via `readFileSync`, the database opened wi
 | Item | Criterion | Weight |
 |---|---|---|
 | **A** `dream_runs` has a `DELETE` path | `DELETE FROM dream_runs`, or a `deleteOldDreamRuns` / `purgeDreamRuns` family | verdict |
-| **B** a retention key applies to `dream_runs` | something like `dreamRunsRetentionDays` | verdict |
-| **C** an `input`-only trim exists | `UPDATE dream_runs SET input = NULL` | verdict (decides `PARTIAL`) |
+| **B** a *row-delete* retention key applies to `dream_runs` | something like `dreamRunsRetentionDays` | verdict |
+| **B2** a *column-trim* switch exists (opt-in, usually `0` = off) | something like `dreamRunsTrimDays` | verdict (decides `OPT-IN`) |
+| **C** an `input`-only trim exists | `UPDATE dream_runs SET input = NULL` | verdict (decides `PARTIAL` / `OPT-IN`) |
 | **D** measured rows / page share / `input` bytes / time span | `dbstat` + `LENGTH(input)` | evidence only, **not part of the verdict** |
 
 It also prints the whole chain "retention key → purge function → target table", which is the only honest way to answer *why none of the four keys covers it*.
 
-Verdicts: `FIXED` (delete path plus a key, or a purge function pointing at the table) · `PARTIAL` (no delete path, no key, but `input` trim — only the fattest column is treated, rows stay forever) · `DEFECT` (none of the three) · `SUSPECT` (a key exists without a delete path, so the key may be dead).
+Verdicts: `FIXED` (delete path plus a key, or a purge function pointing at the table) · `OPT-IN` (no delete path, but a column-trim switch exists — **off by default, so nothing happens until you set it**) · `PARTIAL` (no delete path, no key, but `input` trim — only the fattest column is treated, rows stay forever) · `DEFECT` (none of the three) · `SUSPECT` (a key exists without a delete path, so the key may be dead).
 
 ## Measured here (2026-11-08, mneme `0.12.0`, profile `desktop`)
 
@@ -50,6 +51,17 @@ data       db 60.6 MB · page 4096 × 15515 · freelist 0
 
 verdict PARTIAL
 ```
+
+### Re-measured 2026-11-14 (mneme `0.15.1`) → `OPT-IN`
+
+Upstream resolved #557 as "**trimming columns: yes; deleting rows: no**". `src/config.js:1068` adds `dreamRunsTrimDays` (`z.natural().min(0).max(3650).default(0)`) which, at startup, nulls `input`/`decisions`/`outcome` for rounds older than the window. Rows and the skeleton columns are always kept; `organize` rows are exempt because `input` is the replay payload for apply. Path: `src/maintenance.js` → `store.dreamRunInputStats()` / `store.clearDreamRunInputs()`.
+
+```
+source   A MISS   B MISS   B2 ok (dreamRunsTrimDays, default 0 = off)   C ok
+verdict OPT-IN
+```
+
+**This auditor got it wrong once.** The first version only looked for `*RetentionDays` and `DELETE`; a key called `dreamRunsTrimDays` matches neither, so it read as "no key at all" and graded an accepted upstream fix as `PARTIAL`. `B2` is now its own item, and the default is printed with it — `0 days = no trimming` is the easiest part of this fix to miss: leave it unset and nothing changes.
 
 1. **Very few rows, very large table.** 92 rows take 36.2% of the pages because each row carries ~136 KB of `input`. A row-count threshold will never fire on a table shaped like this.
 2. **The four retention keys really do not cover it** — three purge functions point at `recall_runs` / `llm_audit_logs` / `failure_memories`, and `distillRecords.retentionDays` trims `distill_records`. Exactly as filed in #557, only the version moved from 0.10.1 to 0.12.0.

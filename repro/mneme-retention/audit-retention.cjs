@@ -91,9 +91,21 @@ function hasDreamRunInputTrim(storeSrc) {
   return /UPDATE\s+dream_runs\s+SET\s+[\s\S]{0,80}?input\s*=\s*NULL/i.test(storeSrc);
 }
 
-/** B：有没有保留期配置键落到 dream_runs 上 */
+/** B：有没有「删行型」保留期配置键落到 dream_runs 上 */
 function hasDreamRunRetentionKey(configSrc) {
   return /\bdream(?:Run|Runs)?RetentionDays\b/i.test(configSrc);
+}
+
+/**
+ * B2：有没有「裁列型」开关（dreamRunsTrimDays 之类）。
+ * 2026-11 上游对 #557 的处置是「裁列同意、删行不同意」：新增一个 opt-in 的裁剪窗口，
+ * 只把 input/decisions/outcome 三列置空，行与骨架永远保留。名字里没有 Retention，
+ * 只按 *RetentionDays 找会把它判成「没有键」——这是本条审计器最早的一次误判。
+ */
+function hasDreamRunTrimKey(configSrc) {
+  const m = configSrc.match(/\bdream(?:Run|Runs)?TrimDays\s*:[^\n]*?default\(\s*(\d+)\s*\)/i);
+  if (m) return { present: true, defaultDays: Number(m[1]) };
+  return { present: /\bdream(?:Run|Runs)?TrimDays\b/i.test(configSrc), defaultDays: null };
 }
 
 /**
@@ -109,7 +121,7 @@ function collectRetentionKeys(configSrc) {
     const m = line.match(/^\s*(\w+)\s*:\s*z\.natural\([^)]*\)[\s\S]*?default\(\s*(\d+)\s*\)/);
     if (!m) continue;
     const key = m[1];
-    if (!/retentionDays$/i.test(key)) continue;
+    if (!/(?:retentionDays|trimDays)$/i.test(key)) continue;
     // 往上找最近一个 `foo: z.object({` 作为父键
     let parent = '·';
     for (let j = i - 1; j >= 0 && j > i - 80; j--) {
@@ -143,16 +155,18 @@ function judge(src, cfg, retentionTargets) {
   const del = hasDreamRunDelete(src);
   const trim = hasDreamRunInputTrim(src);
   const key = hasDreamRunRetentionKey(cfg);
+  const trimKey = hasDreamRunTrimKey(cfg);
   const coversTable = retentionTargets.some((t) => t.table === 'dream_runs');
 
   let verdict;
-  if (del && (key || coversTable)) verdict = 'FIXED';
+  if (del && (key || coversTable || trimKey.present)) verdict = 'FIXED'; // 有删行路径 + 任一配置入口（含裁列开关）
+  else if (!del && trimKey.present) verdict = 'OPT-IN'; // 给了裁列开关（默认通常为 0 = 不裁），行仍永久保留
   else if (!del && !key && !coversTable && trim) verdict = 'PARTIAL';
   else if (!del && !key && !coversTable && !trim) verdict = 'DEFECT';
   else if (!del && (key || coversTable)) verdict = 'SUSPECT'; // 有保留期键却没有删除路径：键是死的
   else verdict = 'PARTIAL'; // 有删除路径但没有任何保留期键 → 只能手动清，仍算部分
 
-  return { verdict, deletePath: del, retentionKey: key, inputTrim: trim, coveredByPurge: coversTable };
+  return { verdict, deletePath: del, retentionKey: key, trimKey, inputTrim: trim, coveredByPurge: coversTable };
 }
 
 // ── 数据侧：只读打开库，量它有多胖 ───────────────────────────────────────────
@@ -204,6 +218,7 @@ const FIXTURE_FIXED = `
 `;
 const CFG_NO_KEY = `\n    retentionDays: z.natural().min(1).max(3650).default(90)\n`;
 const CFG_WITH_KEY = `\n    dreamRunsRetentionDays: z.natural().min(1).max(3650).default(90)\n`;
+const CFG_WITH_TRIM = `\n    dreamRunsTrimDays: z.natural().min(0).max(3650).default(0)\n`;
 
 function selftest() {
   const cases = [
@@ -212,6 +227,8 @@ function selftest() {
     { name: '有删除 + 有保留期键 → FIXED', src: FIXTURE_FIXED, cfg: CFG_WITH_KEY, targets: [], expect: 'FIXED' },
     { name: '有删除 + 仅靠他表 purge 间接覆盖 → FIXED', src: FIXTURE_FIXED, cfg: CFG_NO_KEY, targets: [{ fn: 'purgeX', table: 'dream_runs' }], expect: 'FIXED' },
     { name: '有保留期键但无删除路径（键是死的）→ SUSPECT', src: FIXTURE_DEFECT, cfg: CFG_WITH_KEY, targets: [], expect: 'SUSPECT' },
+    { name: '只有裁列型开关（上游对 #557 的处置）→ OPT-IN', src: FIXTURE_PARTIAL, cfg: CFG_WITH_TRIM, targets: [], expect: 'OPT-IN' },
+    { name: '裁列开关 + 真删除路径仍算 FIXED', src: FIXTURE_FIXED, cfg: CFG_WITH_TRIM, targets: [], expect: 'FIXED' },
   ];
   let fail = 0;
   for (const c of cases) {
@@ -308,7 +325,8 @@ function main() {
   console.log('');
   console.log('源码侧');
   console.log(`  ${mark(j.deletePath)}  A  dream_runs 本表有 DELETE 路径`);
-  console.log(`  ${mark(j.retentionKey)}  B  有保留期配置键落到 dream_runs（dreamRunsRetentionDays 之类）`);
+  console.log(`  ${mark(j.retentionKey)}  B  有「删行型」保留期键落到 dream_runs（dreamRunsRetentionDays 之类）`);
+  console.log(`  ${mark(j.trimKey.present)}  B2 有「裁列型」开关（dreamRunsTrimDays 之类）${j.trimKey.present ? `，默认 ${j.trimKey.defaultDays == null ? '·' : j.trimKey.defaultDays}${j.trimKey.defaultDays === 0 ? ' 天 = 不裁' : ' 天'}` : ''}`);
   console.log(`  ${mark(j.inputTrim)}  C  有「只清 input 列」的裁剪入口（UPDATE dream_runs SET input = NULL）`);
   console.log('');
   console.log(`  现有保留期键（共 ${keys.length} 个）:`);
@@ -340,6 +358,7 @@ function main() {
   console.log('');
   console.log(`结论 ${j.verdict}`);
   if (j.verdict === 'FIXED') console.log('  有删除路径且有保留期键：这张表会自己变老。');
+  else if (j.verdict === 'OPT-IN') console.log(`  上游给了「裁列」开关（只清 input/decisions/outcome，行与骨架保留），但默认 ${j.trimKey.defaultDays == null ? '关' : j.trimKey.defaultDays + ' 天'}${j.trimKey.defaultDays === 0 ? ' = 不裁' : ''} —— 不开就不生效，库仍会长；开了则窗口外老轮次的回放能力降级为骨架级。`);
   else if (j.verdict === 'PARTIAL') console.log('  行本身永久保留（没有 DELETE、没有保留期键），但有「只清 input 列」的裁剪入口 —— 只能治最肥的那一列。');
   else if (j.verdict === 'DEFECT') console.log('  既没有删除路径也没有保留期键：无界增长，与 #557 描述一致。');
   else console.log('  有保留期键却找不到删除路径（或相反）：键可能是死的，建议人工确认调用链。');
