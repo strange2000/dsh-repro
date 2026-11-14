@@ -22,13 +22,13 @@ Zero dependencies, read-only: sources via `readFileSync`; `app.asar` is read **o
 
 | Item | Criterion | Weight |
 |---|---|---|
-| **A** `locateCliJs` has candidates / probing | candidate array, loop over paths, or a mention of the real `desktop-cli` entry | verdict |
+| **A** the CLI locator (`locateCliJs`, renamed `resolveCliJs`) has candidates / probing | candidate array, loop over paths, or a mention of the real `desktop-cli` entry; the function is looked up **by a list of names**, not one | verdict |
 | **B** can read inside the asar | `original-fs` / `@electron/asar` / `extractFile` | reference |
 | **C** returns `null` when it cannot locate | triggers the `kind: "environment"` fallback instead of handing out a bad path | reference (supports A) |
-| **D** `locateDshExe` knows the DSH NEXT exe | only `deepseek harness.exe` + `Program Files\DeepSeek Harness` ⇒ it does not | verdict |
+| **D** `locateDshExe` knows the DSH NEXT exe | only `deepseek harness.exe` + `Program Files\DeepSeek Harness` ⇒ it does not; a `DSH NEXT` directory name or a `DSH_EXE` override also counts | verdict |
 | **measured** does the hardcoded path exist in the real install | zero-dep asar header walk | verdict (decides `DEFECT`) |
 
-Verdicts: `FIXED` (already candidate/probe shaped) · `DEFECT` (hardcoded and the path does not exist) · `SUSPECT` (the path happens to exist, no install found to verify, or the source shape could not be judged), each with the reason.
+Verdicts: `FIXED` (already candidate/probe shaped) · `DEFECT` (hardcoded and the path does not exist) · `SUSPECT` (the path happens to exist, no install found to verify, or the source shape could not be judged), each with the reason. `SUSPECT` also covers "no function body found under `locateCliJs` / `resolveCliJs` / `resolveCliPath`" — upstream renames land there, which is why the lookup now takes a list of names.
 
 ## Measured here (2026-11-08, mneme `0.12.0`, DSH NEXT Desktop)
 
@@ -43,6 +43,17 @@ install  D:\DSH NEXT\resources\app.asar
 
 verdict DEFECT
 ```
+
+### Re-measured 2026-11-14 (mneme `0.15.1`) → `FIXED`
+
+Fixed in upstream #618, and the function was renamed `resolveCliJs`: a priority-ordered candidate array (`DSH_CLI_JS` → `<asar>/lib/desktop-cli.js` → the two legacy layouts), probed with `existsSync`, returning `{ path, candidates, verified: true }` on a hit. `DSH_CLI_JS` is treated as "the human already answered" — it is never second-guessed, and a missing one fails loudly on the path that was given. `locateDshExe` now tries both layouts (`DeepSeek Harness`, `DSH NEXT`) × both names and honours `DSH_EXE`.
+
+```
+source   A ok (resolveCliJs)   B none   C no   D ok (DSH_EXE override also known)
+verdict FIXED
+```
+
+**This auditor misjudged it too.** It extracted the body of `locateCliJs` by that one name; after the rename there was nothing to extract, so a fixed version was graded `SUSPECT`. It now searches a list of names and prints which one it actually matched.
 
 1. **It is worse than the issue says.** The report described three hardcoded prefixes (`app.asar.unpacked` / `app` / `node_modules`). Measured: DSH NEXT's asar has **no top-level `dsh/`**, and `dsh-desktop-host` **does not exist** among those 340 `@deepseek-ai` packages. Adding more prefixes cannot fix a package that is not there.
 2. **The real entry sits right next door.** `app.asar/lib/desktop-cli.js` has been there all along; the invocation (`--expose-internals <path> --profile … --json headless <task>`) is unchanged — only that first argument needs to point at it.

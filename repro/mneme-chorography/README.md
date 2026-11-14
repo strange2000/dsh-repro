@@ -22,13 +22,13 @@ node audit-t1-locate.cjs --selftest
 
 | 项 | 判据 | 权重 |
 |---|---|---|
-| **A** `locateCliJs` 有候选路径 / 探测回退 | 函数体里有候选数组、循环试路径、或提到真入口 `desktop-cli` | 结论项 |
+| **A** CLI 定位函数（`locateCliJs`，改名后为 `resolveCliJs`）有候选路径 / 探测回退 | 函数体里有候选数组、循环试路径、或提到真入口 `desktop-cli`；函数**按候选名单找**，不只认一个名字 | 结论项 |
 | **B** 能读 asar 内部 | `original-fs` / `@electron/asar` / `extractFile` | 参照项 |
 | **C** 定位失败会 `return null` | 触发 `kind: "environment"` 降级，而不是把错路径交出去 | 参照项（A 的补充证据） |
-| **D** `locateDshExe` 认得 DSH NEXT 的 exe 名/位置 | 只认 `deepseek harness.exe` + `Program Files\DeepSeek Harness` ⇒ 不认 | 结论项 |
+| **D** `locateDshExe` 认得 DSH NEXT 的 exe 名/位置 | 只认 `deepseek harness.exe` + `Program Files\DeepSeek Harness` ⇒ 不认；出现 `DSH NEXT` 目录名或 `DSH_EXE` 覆盖也算认得 | 结论项 |
 | **实测** 硬编码路径在真安装里存不存在 | 零依赖解 asar 头，逐段查 `files` | 结论项（决定 DEFECT） |
 
-结论四档：`FIXED`（源码已是候选/探测形状）· `DEFECT`（硬编码且实测路径不存在）· `SUSPECT`（路径恰好存在、或没找到安装目录无法验证、或源码判定不出）—— 都带一句为什么。
+结论四档：`FIXED`（源码已是候选/探测形状）· `DEFECT`（硬编码且实测路径不存在）· `SUSPECT`（路径恰好存在、或没找到安装目录无法验证、或源码判定不出）—— 都带一句为什么。`SUSPECT` 还包括「按 `locateCliJs` / `resolveCliJs` / `resolveCliPath` 三个名字都抠不到函数体」：上游改名会落进这一档，所以判定器改成按候选名单找函数。
 
 ## 本机实测（2026-11-08，mneme `0.12.0`，DSH NEXT 桌面版）
 
@@ -43,6 +43,17 @@ node audit-t1-locate.cjs --selftest
 
 结论 DEFECT
 ```
+
+### 2026-11-14 复测（mneme `0.15.1`）→ `FIXED`
+
+上游在 #618 里把它修了，函数也改名为 `resolveCliJs`：候选数组按优先级排 `DSH_CLI_JS` → `<asar>/lib/desktop-cli.js` → 旧布局两条，逐个 `existsSync` 探测，命中返回 `{ path, candidates, verified: true }`；`DSH_CLI_JS` 是「人明确指定」的答案，指定了就不再猜，不存在则直接失败并如实指出那个路径。`locateDshExe` 一并改成 `["DeepSeek Harness", "DSH NEXT"]` 两种布局 × 两种名字，并支持 `DSH_EXE`。
+
+```
+源码侧   A ok（resolveCliJs）   B 没有   C 不会   D ok（另认 DSH_EXE 覆盖）
+结论 FIXED
+```
+
+**这条判定器也误判过一次**：它按 `locateCliJs` 一个名字抠函数体，上游改名后抠不到，于是把「已修好」判成 `SUSPECT`。现在按候选名单找，并在 A 项里打出实际命中的函数名。
 
 三件值得单独说的：
 

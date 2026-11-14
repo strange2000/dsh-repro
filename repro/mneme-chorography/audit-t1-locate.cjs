@@ -139,6 +139,16 @@ function extractFunctionBody(src, name) {
   return null;
 }
 
+/** 同上，但按候选名单逐个试 —— 上游把 locateCliJs 改名成 resolveCliJs 是已经发生过的演进，
+ *  只认一个函数名会把「已经修好」的新版本判成 SUSPECT。 */
+function extractAnyFunctionBody(src, names) {
+  for (const n of names) {
+    const b = extractFunctionBody(src, n);
+    if (b) return { body: b, name: n };
+  }
+  return { body: null, name: null };
+}
+
 /**
  * 判 locateCliJs 的形状。
  * hardcoded：函数里直接拼 "dsh"/"node_modules"/"dsh-desktop-host" 这一串，且没有候选与探测。
@@ -172,10 +182,14 @@ function judgeLocateCli(body) {
 
 /** lokateDshExe 是否只认「DeepSeek Harness」这一个名字/位置。 */
 function judgeLocateExe(body) {
-  if (!body) return { shape: "unknown", dsNextCovered: false };
-  const onlyHarness =
-    /deepseek harness\.exe/i.test(body) && !/dsh next\.exe/i.test(body) && !/DSH_NEXT|dshNext/i.test(body);
-  return { shape: onlyHarness ? "single-name" : "unknown", dsNextCovered: !onlyHarness };
+  if (!body) return { shape: "unknown", dsNextCovered: false, mentionsEnv: false };
+  // 新版把名字挪进了模块级常量表（DSH_EXE_NAMES = [... "dsh next.exe" ...]），函数体里只留
+  // 一句 includes 与 roots 循环 —— 所以除 "dsh next.exe" 字面，也认 "DSH NEXT" 这个目录名
+  // 与 DSH_EXE 环境变量覆盖。只按 "deepseek harness.exe" 判会把新版误判成 single-name。
+  const mentionsNext = /dsh[\s_-]?next/i.test(body);
+  const mentionsEnv = /DSH_EXE\b/.test(body);
+  const onlyHarness = /deepseek harness\.exe/i.test(body) && !mentionsNext;
+  return { shape: onlyHarness ? "single-name" : "multi-name", dsNextCovered: !onlyHarness, mentionsEnv };
 }
 
 /* ----------------------------- asar 读取 ----------------------------- */
@@ -285,6 +299,34 @@ function selftest() {
   const c = judgeLocateExe(exeSingle);
   ok("只认 DeepSeek Harness 判 single-name", c.shape === "single-name", c.shape);
 
+  // 2026-11 新增：上游把函数改名 resolveCliJs、并把 DSH NEXT 写进 roots 的两种新形状。
+  const fixedNewBody = `export function resolveCliJs(exe, env = process.env) {
+  const asar = join(dirname(exe), "resources", "app.asar");
+  const explicit = typeof env.DSH_CLI_JS === "string" && env.DSH_CLI_JS !== "" ? env.DSH_CLI_JS : null;
+  const candidates = [explicit, join(asar, "lib", "desktop-cli.js")].filter(Boolean);
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return { path: candidate, candidates, verified: true };
+  }
+  return { path: null, candidates, verified: false };
+}`;
+  const b2 = judgeLocateCli(fixedNewBody);
+  ok("改名后的 resolveCliJs 形状判 probe", b2.shape === "probe", b2.shape);
+  ok("extractAnyFunctionBody 按别名找到 resolveCliJs",
+     extractAnyFunctionBody("const x = 1;\n" + fixedNewBody + "\n", ["locateCliJs", "resolveCliJs"]).name === "resolveCliJs", "");
+
+  const exeMulti = `function locateDshExe(env = process.env) {
+  const roots = [env["ProgramFiles"] ?? "C:/Program Files"];
+  for (const root of roots) {
+    for (const name of ["DeepSeek Harness", "DSH NEXT"]) {
+      const candidate = join(root, name, name + ".exe");
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+}`;
+  const c2 = judgeLocateExe(exeMulti);
+  ok("roots 里含 DSH NEXT 判认得", c2.dsNextCovered === true, c2.shape);
+
   // asar 索引遍历：合成结构
   const idx = { files: { lib: { files: { "desktop-cli.js": { size: 1 } } }, dsh: { files: {} } } };
   ok("asarHas 命中 lib/desktop-cli.js", asarHas(idx, ["lib", "desktop-cli.js"]), "");
@@ -331,7 +373,8 @@ function main() {
   const t1Path = path.join(plugin, "lib", "wiki", "t1.js");
   const src = fs.readFileSync(t1Path, "utf8");
 
-  const locateBody = extractFunctionBody(src, "locateCliJs");
+  const locateFn = extractAnyFunctionBody(src, ["locateCliJs", "resolveCliJs", "resolveCliPath", "locateCli"]);
+  const locateBody = locateFn.body;
   const exeBody = extractFunctionBody(src, "locateDshExe");
   const cli = judgeLocateCli(locateBody);
   const exe = judgeLocateExe(exeBody);
@@ -364,7 +407,7 @@ function main() {
   const reasons = [];
   if (cli.shape === "unknown") {
     verdict = "SUSPECT";
-    reasons.push("没能从源码里判定 locateCliJs 的形状（函数可能被改名或打包压缩）");
+    reasons.push("没能从源码里判定 CLI 定位函数的形状（试过 locateCliJs / resolveCliJs / resolveCliPath，可能被改名或压缩）");
   } else if (cli.shape === "probe") {
     verdict = "FIXED";
     reasons.push("locateCliJs 已经是候选/探测形状，不再写死单条 asar 路径");
@@ -390,10 +433,10 @@ function main() {
   console.log(`版本    ${pkg.version || "?"}  ${pkg.name || ""}\n`);
 
   console.log("源码侧（lib/wiki/t1.js）");
-  console.log(`  ${cli.shape === "probe" ? "ok   " : "MISS "} A  locateCliJs 有候选路径 / 探测回退        ${cli.shape === "probe" ? "有" : "无（单条硬编码拼接）"}`);
+  console.log(`  ${cli.shape === "probe" ? "ok   " : "MISS "} A  CLI 定位有候选路径 / 探测回退（${locateFn.name || "未找到定位函数"}）  ${cli.shape === "probe" ? "有" : "无（单条硬编码拼接）"}`);
   console.log(`  ${cli.asarAware ? "ok   " : "--   "} B  能读 asar 内部（original-fs / @electron/asar）  ${cli.asarAware ? "有" : "没有"}`);
   console.log(`  ${cli.returnsNull ? "ok   " : "--   "} C  定位失败会返回 null（触发 environment 降级）    ${cli.returnsNull ? "会" : "不会（直接把路径给出去）"}`);
-  console.log(`  ${exe.dsNextCovered ? "ok   " : "MISS "} D  locateDshExe 认得 DSH NEXT 的 exe 名/位置        ${exe.dsNextCovered ? "认得" : "只认 deepseek harness.exe + Program Files\\DeepSeek Harness"}`);
+  console.log(`  ${exe.dsNextCovered ? "ok   " : "MISS "} D  locateDshExe 认得 DSH NEXT 的 exe 名/位置        ${exe.dsNextCovered ? `认得${exe.mentionsEnv ? "，另有 DSH_EXE 覆盖" : ""}` : "只认 deepseek harness.exe + Program Files\\DeepSeek Harness"}`);
   console.log("");
 
   if (installed && !installed.error) {
