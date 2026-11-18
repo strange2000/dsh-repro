@@ -31,6 +31,7 @@
 | 0008 | [#579](https://github.com/slow-stack/mneme/issues/579) | `choro_module_map` / `choro_read_page` / `choro_search` 的错误分支直接 `return { error, hint }`，而三者都声明了 `additionalProperties: false` 的强 schema ⇒ 宿主一律判 `invalid output`，用户看不到真实原因（没登记 / 多仓库歧义 / 页不存在） | —（仅登记） | closed |
 | 0009 | [#581](https://github.com/slow-stack/mneme/issues/581) | 仓库身份拿本机绝对路径当键（`lib/wiki/t0.js:47` 存 `realpathSync(resolve(repoRoot))`，T1 在 `t1.js:239` 要求逐字符相同）⇒ 双系统共用一个 `memory.db` 时地志无法跨端复用；在另一端再跑一次 T0 就多一条记录，从此不带 `repo` 调用即 `repo-ambiguous`（而它的错误载荷又不合 schema，见 0008） | —（仅登记） | closed |
 | 0010 | [#582](https://github.com/slow-stack/mneme/issues/582) | `dsh-mneme-wiki` 自带的手写迷你渲染器把 `\|` 开头的行只做成等宽 `div`（`lib/client.js:10227` + `.mneme-wikitablerow` 的 `white-space:pre`）、不剥 `<!-- CHORO:T1:START -->` 这类 HTML 注释、front matter 的 `status` 在 T1 后不回写（库里 `choro_pages` 已 `enriched`、页面仍是 `skeleton`）⇒ 模块页上看到的是 Markdown 源码而不是排版后的页面 | —（仅登记） | closed |
+| 0022 | [#712](https://github.com/slow-stack/mneme/issues/712) | 蒸馏（`summarize_compress`）长期几乎全 `filtered-empty`，而拒收原因里只有 `type` 是常量：0.16.1 新加的 `reject_reasons` 读数在**本机 215 轮失败 / 被拒 2,687 条**上给出 `bad_type` **2,616（97.4%）**、`bad_title` 66、`bad_content` 5、`not_object` 0 ⇒ 主因是模型自造分类（`结论` / `fact` / `user_request` / `当前状态` / `current_state`…），而 #712 里猜的「键名被 `name`/`url`/`notes` 顶掉」只占 2.6%（215 轮里 32 轮出现过，中位每轮被拒 12 条） | `reject_reasons` 由 `lib/summarize.js` 的 `filtered.rejectReasons` 写入 `llm_audit_logs.metadata`（`failure_kind=filtered-empty`）；判据 = 对 `memory.db` 一条聚合 SQL，任何用户都能在自己库上重跑 | open |
 
 ### c1overzz/dsh-bili-scroll
 
@@ -77,7 +78,7 @@
 
 ## 关于材料的四点说明
 
-**一、21 条里只有 6 条配得上脚本，其余是「登记」。** 门槛写在上面「收录标准」里：能在源码定位到具体位置、或有一条可观测判据，就进索引；要再进一步给可运行脚本，还得满足「一条命令能判定，且判定结果对别人也有用」。不少问题做不到 —— 有的只是建议（0014 的会话分组），有的必须宿主跑起来才能验（0020 的市场版本判定），硬写成脚本只会得到一堆「无法判定」。
+**一、22 条里只有 6 条配得上脚本，其余是「登记」。** 门槛写在上面「收录标准」里：能在源码定位到具体位置、或有一条可观测判据，就进索引；要再进一步给可运行脚本，还得满足「一条命令能判定，且判定结果对别人也有用」。不少问题做不到 —— 有的只是建议（0014 的会话分组），有的必须宿主跑起来才能验（0020 的市场版本判定），硬写成脚本只会得到一堆「无法判定」。
 
 **二、六套脚本里五套是「只读审计器」，不是一键复现脚本。** 这些缺陷的破坏面都是用户自己的安装（一次会回滚的升级、一份会被冲掉的配置、一个一直变大的库），拿别人的机器跑一遍既不合适也复现不出来。审计器把同一个问题换个问法：**「我这份版本还会不会这样」**，并且都自带 `--selftest` —— 把「缺陷形状」和「修复后形状」的合成源码喂给同一个判定函数，先证明尺子分得开，再看结论。唯一的例外是 `repro/mneme-0001/`（取证脚本 + 三臂对照实验），因为那条问题本身是行为问题。
 
@@ -90,7 +91,7 @@
 `.github/workflows/repro.yml` 在每次 push / PR 时跑 `tools/check-repro.cjs`：只读、不联网、不改文件，失败只标红。三组检查：
 
 - **审计器自检** —— 5 个审计器逐个 `--selftest`，喂的是合成 fixture（缺陷形状与修复形状各一份），必须全绿。判定器自己先证明分得开，才谈得上用它下结论。
-- **索引一致** —— `README.md` 与 `README.en.md` 的索引行数必须相等（当前 21 条），免得一边加了条目、另一边忘了同步。
+- **索引一致** —— `README.md` 与 `README.en.md` 的索引行数必须相等（当前 22 条），免得一边加了条目、另一边忘了同步。
 - **链接完整** —— 仓库内相对链接必须指向真实文件。
 
 本机跑同一条命令即可复现 CI 的结果：
