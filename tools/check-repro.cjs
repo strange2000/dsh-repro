@@ -4,7 +4,7 @@
  *
  * 三个判定组：
  *   S  selftest  —— 每个审计器的 --selftest 必须通过（喂合成源码/内存库，离线可跑，不读本机安装）
- *   I  index     —— README.md 与 README.en.md 的索引行数必须相等（21 条）
+ *   I  index     —— README.md 与 README.en.md 的索引行数必须相等（22 条）
  *   L  link      —— 仓库内相对链接指向的文件必须存在
  *
  * 只读：不修改任何文件，不联网，不安装依赖。失败只标红。

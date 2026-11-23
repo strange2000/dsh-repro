@@ -31,7 +31,6 @@
 | 0008 | [#579](https://github.com/slow-stack/mneme/issues/579) | `choro_module_map` / `choro_read_page` / `choro_search` 的错误分支直接 `return { error, hint }`，而三者都声明了 `additionalProperties: false` 的强 schema ⇒ 宿主一律判 `invalid output`，用户看不到真实原因（没登记 / 多仓库歧义 / 页不存在） | —（仅登记） | closed |
 | 0009 | [#581](https://github.com/slow-stack/mneme/issues/581) | 仓库身份拿本机绝对路径当键（`lib/wiki/t0.js:47` 存 `realpathSync(resolve(repoRoot))`，T1 在 `t1.js:239` 要求逐字符相同）⇒ 双系统共用一个 `memory.db` 时地志无法跨端复用；在另一端再跑一次 T0 就多一条记录，从此不带 `repo` 调用即 `repo-ambiguous`（而它的错误载荷又不合 schema，见 0008） | —（仅登记） | closed |
 | 0010 | [#582](https://github.com/slow-stack/mneme/issues/582) | `dsh-mneme-wiki` 自带的手写迷你渲染器把 `\|` 开头的行只做成等宽 `div`（`lib/client.js:10227` + `.mneme-wikitablerow` 的 `white-space:pre`）、不剥 `<!-- CHORO:T1:START -->` 这类 HTML 注释、front matter 的 `status` 在 T1 后不回写（库里 `choro_pages` 已 `enriched`、页面仍是 `skeleton`）⇒ 模块页上看到的是 Markdown 源码而不是排版后的页面 | —（仅登记） | closed |
-| 0022 | [#712](https://github.com/slow-stack/mneme/issues/712) | 蒸馏（`summarize_compress`）长期几乎全 `filtered-empty`，而拒收原因里只有 `type` 是常量：0.16.1 新加的 `reject_reasons` 读数在**本机 215 轮失败 / 被拒 2,687 条**上给出 `bad_type` **2,616（97.4%）**、`bad_title` 66、`bad_content` 5、`not_object` 0 ⇒ 主因是模型自造分类（`结论` / `fact` / `user_request` / `当前状态` / `current_state`…），而 #712 里猜的「键名被 `name`/`url`/`notes` 顶掉」只占 2.6%（215 轮里 32 轮出现过，中位每轮被拒 12 条） | `reject_reasons` 由 `lib/summarize.js` 的 `filtered.rejectReasons` 写入 `llm_audit_logs.metadata`（`failure_kind=filtered-empty`）；判据 = 对 `memory.db` 一条聚合 SQL，任何用户都能在自己库上重跑 | open |
 
 ### c1overzz/dsh-bili-scroll
 
@@ -55,6 +54,7 @@
 |---|---|---|---|---|
 | 0015 | [#1968](https://github.com/zhu1090093659/dsh-web/issues/1968) / [#1969](https://github.com/zhu1090093659/dsh-web/issues/1969) | dsh-market.com 边缘中继间歇返回 503 `relay storage unavailable`，而 `relay.state` 仍报 `running`；手机启动要拉 111 个前端模块，任一失败启动器就不切页 ⇒ 永久停在 `Loading plugins…`。判据是**同一路径、同 111 个 URL 的并发对照**：6 并发 111/111 通过，紧接着串行 22/111 失败（17 条 `relay storage unavailable` + 5 条空响应），临时 `*.trycloudflare.com` 隧道 111/111 通过 | —（仅登记） | closed |
 | 0016 | [#1954](https://github.com/zhu1090093659/dsh-web/issues/1954) / [#1955](https://github.com/zhu1090093659/dsh-web/issues/1955) | `packages/dsh-session-archive` 抢占 `settings.section` 的共享 cell id `archived-sessions`（priority 0）并用 `try/catch` 静默兜底 ⇒ 第三方归档插件在**零提示**下整块丢失设置页，只留一条启动期 `Uncaught Error`；名字相同的 id 在同一个 list slot 上只能有一个注册方，谁先注册谁独占 | [reports/0004](reports/0004-settings-section-shared-id.md) · [扫描器](repro/settings-sections/README.md)（与 0017 是同一冲突的两侧） | closed |
+| 0022 | [#2085](https://github.com/zhu1090093659/dsh-web/issues/2085) | 皮肤中心冷启动拉 `tight-sidebar` 的样式表耗时 **14.59 s**，超出 `SKIN_CSS_REQUEST_TIMEOUT_MS = 1e4` 预算 ⇒ `serveStylesheet()` 返回 500 `css-transform-failed`；渲染端 `bootSkinRuntime()` 的 catch 只做一次 `adopt(null, null)`（`lib/client.js:1768-1770`）⇒ `removeAttribute('data-dsh-skin')` ⇒ 官方默认。**选择一直在** `~/.dsh/skin-center-active.json`，失败当时 `GET /active` 也返回 `tight-sidebar` —— 丢的是启动那一次加载，不是持久化 | [审计器](repro/skins-coldstart/README.md)（A/B 为结论项）· [reports/0007](reports/0007-skin-center-coldstart-fallback.md) | open · 0.4.21 实测 DEFECT（A 无重试、B 预算未放宽） |
 
 ### MichengAI/dsh-archive-manager
 
@@ -78,9 +78,9 @@
 
 ## 关于材料的四点说明
 
-**一、22 条里只有 6 条配得上脚本，其余是「登记」。** 门槛写在上面「收录标准」里：能在源码定位到具体位置、或有一条可观测判据，就进索引；要再进一步给可运行脚本，还得满足「一条命令能判定，且判定结果对别人也有用」。不少问题做不到 —— 有的只是建议（0014 的会话分组），有的必须宿主跑起来才能验（0020 的市场版本判定），硬写成脚本只会得到一堆「无法判定」。
+**一、22 条里只有 7 条配得上脚本，其余是「登记」。** 门槛写在上面「收录标准」里：能在源码定位到具体位置、或有一条可观测判据，就进索引；要再进一步给可运行脚本，还得满足「一条命令能判定，且判定结果对别人也有用」。不少问题做不到 —— 有的只是建议（0014 的会话分组），有的必须宿主跑起来才能验（0020 的市场版本判定），硬写成脚本只会得到一堆「无法判定」。
 
-**二、六套脚本里五套是「只读审计器」，不是一键复现脚本。** 这些缺陷的破坏面都是用户自己的安装（一次会回滚的升级、一份会被冲掉的配置、一个一直变大的库），拿别人的机器跑一遍既不合适也复现不出来。审计器把同一个问题换个问法：**「我这份版本还会不会这样」**，并且都自带 `--selftest` —— 把「缺陷形状」和「修复后形状」的合成源码喂给同一个判定函数，先证明尺子分得开，再看结论。唯一的例外是 `repro/mneme-0001/`（取证脚本 + 三臂对照实验），因为那条问题本身是行为问题。
+**二、七套脚本里六套是「只读审计器」，不是一键复现脚本。** 这些缺陷的破坏面都是用户自己的安装（一次会回滚的升级、一份会被冲掉的配置、一个一直变大的库），拿别人的机器跑一遍既不合适也复现不出来。审计器把同一个问题换个问法：**「我这份版本还会不会这样」**，并且都自带 `--selftest` —— 把「缺陷形状」和「修复后形状」的合成源码喂给同一个判定函数，先证明尺子分得开，再看结论。唯一的例外是 `repro/mneme-0001/`（取证脚本 + 三臂对照实验），因为那条问题本身是行为问题。
 
 **三、`·` 不是「通过」。** 判定项旁边标 `·` 的是参照项：单看它会误判已修版本（例如 B2 的 `_set` 标记，挡住了「陈旧键被写回又被读回」，但写路径没改）。索引里标 `·` 的条目同理，都是「部分缓解」。当前已知状态：0002 于 2.8.x 修、0003 与 0011–0013 于 2.5.0 修、0016 / 0017 由双方各自改名解决、0006 与 0007 在本机 0.12.0 上分别是 **PARTIAL** 与 **DEFECT**。材料留着是为了**回滚检测**：插件降级、或换一台还在旧版本的机器，一条命令就能说出「哪一条回来了」。
 
@@ -90,7 +90,7 @@
 
 `.github/workflows/repro.yml` 在每次 push / PR 时跑 `tools/check-repro.cjs`：只读、不联网、不改文件，失败只标红。三组检查：
 
-- **审计器自检** —— 5 个审计器逐个 `--selftest`，喂的是合成 fixture（缺陷形状与修复形状各一份），必须全绿。判定器自己先证明分得开，才谈得上用它下结论。
+- **审计器自检** —— 6 个审计器逐个 `--selftest`，喂的是合成 fixture（缺陷形状与修复形状各一份），必须全绿。判定器自己先证明分得开，才谈得上用它下结论。
 - **索引一致** —— `README.md` 与 `README.en.md` 的索引行数必须相等（当前 22 条），免得一边加了条目、另一边忘了同步。
 - **链接完整** —— 仓库内相对链接必须指向真实文件。
 
