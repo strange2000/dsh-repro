@@ -90,18 +90,19 @@ The `--selftest` is not decoration: it feeds a synthetic defect-shaped and fixed
 ```
 skin-center cold-start fallback · read-only audit
 
-plugin dir : C:\Users\stran\.dsh\profiles\desktop\node_modules\@linxin666\dsh-client-ui-skin-center
+plugin dir : ~/.dsh/profiles/<profile>/node_modules\@linxin666\dsh-client-ui-skin-center
 version    : 0.4.21
   ❌ [A] 落默认前无循环/退避/重试：一次性 adopt 失败即清皮肤
   ❌ [B] 预算仍是 10000ms（冷启动首请求实测 14.59s 打不住）
   verdict: DEFECT
 
-host logs  : C:\Users\stran\.dsh\logs (6 .jsonl)
+host logs  : ~/.dsh/logs (6 .jsonl)
   ❌ [C] stylesheet load failed ×9，switch failed ×9，日期：2026-11-16 / 2026-11-17 / 2026-11-18 / 2026-11-20 / 2026-11-23
   ❌ [D] active=null（initialized=true）
 
 note: [C] is corroborating (history only); the verdict comes from [A], [B] says whether the budget masks it.
 脚本不改任何文件、不改配置；--probe 是唯一会联网的选项，且只打本机 GUI。
+(Paths above are normalized to `~/.dsh` / `<profile>` with the local username removed; everything else is verbatim.)
 ```
 
 `[D]` reads `active=null` because **the user had already switched back to the official default by the time this was written** (to screenshot the default look) — not part of the failure. At failure time both `active` and `GET /active` were `tight-sidebar`; see the table above.

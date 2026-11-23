@@ -50,17 +50,18 @@ Verdicts: `FIXED` (A present) / `PARTIAL` (budget widened or prewarmed only — 
 ```
 skin-center cold-start fallback · read-only audit
 
-plugin dir: C:\Users\stran\.dsh\profiles\desktop\node_modules\@linxin666\dsh-client-ui-skin-center
+plugin dir: ~/.dsh/profiles/<profile>/node_modules\@linxin666\dsh-client-ui-skin-center
 version   : 0.4.21
   [FAIL] [A] 落默认前无循环/退避/重试：一次性 adopt 失败即清皮肤
   [FAIL] [B] 预算仍是 10000ms（冷启动首请求实测 14.59s 打不住）
   verdict: DEFECT
 
-host logs: C:\Users\stran\.dsh\logs (6 .jsonl)
+host logs: ~/.dsh\logs (6 .jsonl)
   [FAIL] [C] stylesheet load failed ×9, switch failed ×9, dates: 2026-11-16 / 11-17 / 11-18 / 11-20 / 11-23
   [FAIL] [D] active=null（initialized=true）
 
 note: [C] is corroborating (history only); the verdict comes from [A], [B] says whether the budget masks it.
+(Paths above are normalized to `~/.dsh` / `<profile>` with the local username removed; everything else is verbatim.)
 The script writes nothing and changes no config; --probe is the only networked option and only hits the local GUI.
 ```
 

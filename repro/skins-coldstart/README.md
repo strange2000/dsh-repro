@@ -50,17 +50,18 @@ node audit-coldstart.cjs --selftest        # 只跑判定器自检（合成数�
 ```
 皮肤中心冷启动回退 · 只读审计
 
-插件目录：C:\Users\stran\.dsh\profiles\desktop\node_modules\@linxin666\dsh-client-ui-skin-center
+插件目录：~/.dsh/profiles/<profile>/node_modules\@linxin666\dsh-client-ui-skin-center
 版本：0.4.21
   ❌ [A] 落默认前无循环/退避/重试：一次性 adopt 失败即清皮肤
   ❌ [B] 预算仍是 10000ms（冷启动首请求实测 14.59s 打不住）
   结论：DEFECT
 
-宿主日志：C:\Users\stran\.dsh\logs（6 个 .jsonl）
+宿主日志：~/.dsh/logs（6 个 .jsonl）
   ❌ [C] stylesheet load failed ×9，switch failed ×9，日期：2026-11-16 / 2026-11-17 / 2026-11-18 / 2026-11-20 / 2026-11-23
   ❌ [D] active=null（initialized=true）
 
 说明：[C] 是参照项（读的是历史日志），结论只由 [A] 决定、[B] 判断是否被绕开。
+（上面的路径已把本机用户名隐去、归一化成 `~/.dsh` 与 `<profile>`，其余逐字保留。）
 脚本不改任何文件、不改配置；--probe 是唯一会联网的选项，且只打本机 GUI。
 ```
 
